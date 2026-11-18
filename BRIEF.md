@@ -138,6 +138,7 @@ Interaction:
 - Fonts (Google Fonts): Barlow Semi Condensed 500/600 for headings (h1 30 px, h2 20 px), IBM Plex Sans 400/500/600 for body text (15 px), IBM Plex Mono 400/500 for all numbers (tabular figures).
 - Page is at most 1,180 px wide, with 16 px side padding and 16 px gaps. Panels have a 1 px border, 12 px corner radius and 16 px padding.
 - Top row: radar and controls side by side (1.15 : 1). Below 900 px they stack in one column.
+- Tab icon: an inline SVG in a `data:` URL, showing a white heptagon radar shape on a rounded square in the light-theme accent green (#0d8a63). Because it is inline, there's no separate icon file and no request for /favicon.ico.
 - Theme follows the system light/dark setting. `data-theme="light"` or `"dark"` on `<html>` overrides it.
 
 | Token | Light | Dark | Used for |

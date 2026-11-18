@@ -134,6 +134,18 @@ const tests = {
     });
     return { pass: res.bad.length === 0, detail: `${res.n} solves, ${res.bad.length} off` + (res.bad.length ? ': ' + res.bad.slice(0, 3).join('; ') : '') };
   },
+  // The page declares a tab icon and it decodes as an image (so browsers don't fall back to /favicon.ico).
+  async tabIcon(page) {
+    const res = await page.evaluate(() => new Promise(done => {
+      const link = document.querySelector('link[rel="icon"]');
+      if (!link) return done({ ok: false, why: 'no <link rel="icon">' });
+      const img = new Image();
+      img.onload = () => done({ ok: img.naturalWidth > 0, why: `decodes at ${img.naturalWidth} x ${img.naturalHeight}` });
+      img.onerror = () => done({ ok: false, why: 'icon does not decode' });
+      img.src = link.href;
+    }));
+    return { pass: res.ok, detail: res.why };
+  },
   // Stock values from the brief.
   async stockValues(page) {
     const r = (await state(page)).r;
