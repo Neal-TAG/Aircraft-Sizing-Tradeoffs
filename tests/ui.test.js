@@ -2,21 +2,18 @@
 //
 //   node tests/ui.test.js [page.html] [reference.html]
 //
-// page.html defaults to index.html. If reference.html is given (an earlier revision, for example
-// `git show <commit>:index.html > old.html`), a regression pass checks that the sizing model gives
-// identical numbers to the reference for the Skyvan constants. Works with REVB-style pages whose
-// model() takes (W, V, S, CLmax, AR).
+// page.html defaults to index.html. If reference.html is given (for example an earlier
+// revision from `git show <commit>:index.html > old.html`), every check also runs on it,
+// and a regression pass confirms both pages render the same output wherever payload > 0.
 //
 // Uses an installed Microsoft Edge by default. Set BROWSER_CHANNEL=chrome to use Chrome,
 // or BROWSER_PATH to point at any Chromium-based browser.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const fs = require('fs');
 
 const target = path.resolve(process.argv[2] || 'index.html');
 const reference = process.argv[3] ? path.resolve(process.argv[3]) : null;
 const fileUrl = f => 'file:///' + encodeURI(f.replace(/\\/g, '/'));
-const IND = path.join(__dirname, 'independent');
 
 async function open(browser, f, width = 1280) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -35,37 +32,11 @@ async function pressOnHandle(page, i, key) {
   await page.focus(`#radar circle.handle[data-i="${i}"]`);
   await page.keyboard.press(key);
 }
-const AXES = ['V', 'W', 'U', 'D', 'n', 'S', 'Vs'];            // the 7 draggable radar handles, in order
-const DRIVES = { V: 'V', W: 'W', U: 'W', D: 'V', n: 'V', S: 'S', Vs: 'S' };
-const LIMITS = { V: [40, 500], W: [500, 1300000], S: [30, 10000] };
+const AXES = ['V', 'W', 'payload', 'D', 'n', 'S', 'Vs'];
 const axisVal = (s, id) => (id === 'V' || id === 'W') ? s.st[id] : s.r[id];
-const relStep = (id, v) => id === 'V' ? 1 : Math.pow(10, Math.floor(Math.log10(v)) - 3); // V is linear step 1; W and S round to 4 significant figures
 
 const tests = {
-  // ---------- REVE layout: every control docked beside the results ----------
-  async layoutKeepsResultsInView(page) {
-    // every slider and number box lives in the control rail
-    const placement = await page.evaluate(() => { const ids = [...document.querySelectorAll('input[type=range]')].map(i => i.id);
-      return { n: ids.length, outside: ids.filter(id => !document.getElementById(id).closest('.rail')) }; });
-    // after scrolling to the bottom, the rail's fuel slider and the strip are both still on screen
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(50);
-    const geo = await page.evaluate(() => { const vis = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.height > 0; };
-      const fuel = document.getElementById('s_Fmax'); fuel.scrollIntoView({ block: 'nearest' });
-      return { scrolled: scrollY > 1000, strip: vis(document.getElementById('strip')), stripTop: Math.round(document.getElementById('strip').getBoundingClientRect().top), fuel: vis(fuel) }; });
-    // the strip follows the model: full-tanks range and its change against the reference
-    const read = () => page.evaluate(() => { const ro = [...document.querySelectorAll('#strip .ro')].find(e => e.querySelector('.k').textContent === 'Range, full tanks');
-      return { n: ro.querySelector('.n').firstChild.textContent, d: ro.querySelector('.d').textContent, cls: ro.querySelector('.d').className, RC: window.__last.RC }; });
-    const a = await read();
-    await set(page, [['Fmax', 3000]]);
-    const b = await read();
-    const fmt = x => Math.round(x).toLocaleString('en-US');
-    const ok = placement.outside.length === 0 && placement.n >= 20 && geo.scrolled && geo.strip && geo.stripTop >= 0 && geo.stripTop <= 12 && geo.fuel &&
-      a.n === fmt(a.RC) && a.d === '±0%' && b.n === fmt(b.RC) && b.RC > a.RC && /^\+/.test(b.d) && / up$/.test(b.cls);
-    return { pass: ok, detail: `${placement.n} sliders, ${placement.outside.length} outside the rail; at the bottom: strip on screen ${geo.strip} (top ${geo.stripTop} px), fuel slider on screen ${geo.fuel}; strip range ${a.n} (${a.d}) → ${b.n} (${b.d})` };
-  },
-
-  // ---------- carried over from REVB ----------
+  // Typing a value and pressing Esc should leave the model alone.
   async escCancels(page) {
     await page.click('#n_W', { clickCount: 3 });
     await page.keyboard.type('9000');
@@ -75,25 +46,28 @@ const tests = {
     const box = await page.inputValue('#n_W');
     return { pass: s.st.W === 12500 && box === '12500', detail: `W after Esc = ${s.st.W}, box shows ${box}` };
   },
-  async usefulLoadUpWhenNegative(page) {
+  // Negative payload: Arrow Up on the payload handle should raise payload.
+  async payloadUpWhenNegative(page) {
     await set(page, [['S', 700], ['W', 5000]]);
     const a = await state(page);
     await pressOnHandle(page, 2, 'ArrowUp');
     const b = await state(page);
-    return { pass: a.r.U < 0 && b.r.U > a.r.U, detail: `useful load ${a.r.U.toFixed(0)} -> ${b.r.U.toFixed(0)}` };
+    return { pass: b.r.payload > a.r.payload, detail: `payload ${a.r.payload.toFixed(0)} -> ${b.r.payload.toFixed(0)}` };
   },
-  async usefulLoadMovesNearZero(page) {
+  // Payload near zero: arrows should still move it.
+  async payloadMovesNearZero(page) {
     await set(page, [['S', 700], ['W', 7100]]);
     const a = await state(page);
     await pressOnHandle(page, 2, 'ArrowUp');
     const b = await state(page);
     await pressOnHandle(page, 2, 'ArrowDown'); await pressOnHandle(page, 2, 'ArrowDown');
     const c = await state(page);
-    return { pass: b.r.U > a.r.U && c.r.U < b.r.U, detail: `useful load ${a.r.U.toFixed(2)} -> up ${b.r.U.toFixed(2)} -> down x2 ${c.r.U.toFixed(2)}` };
+    return { pass: b.r.payload > a.r.payload && c.r.payload < b.r.payload,
+      detail: `payload ${a.r.payload.toFixed(2)} -> up ${b.r.payload.toFixed(2)} -> down x2 ${c.r.payload.toFixed(2)}` };
   },
+  // Every handle, both keys, at 6 points: the axis moves the right way unless its input sits at a range limit.
   async everyArrowMovesTheRightWay(page) {
-    const points = [[], [['W', 16000], ['S', 200]], [['W', 5000], ['S', 700], ['V', 80]], [['V', 240], ['AR', 6]], [['CLmax', 1.2], ['W', 9000]], [['S', 700], ['W', 7100]],
-      [['W', 1300000], ['S', 30]], [['V', 40], ['W', 500]], [['V', 500], ['S', 10000]]];
+    const points = [[], [['W', 16000], ['S', 200]], [['W', 5000], ['S', 700], ['V', 80]], [['V', 240], ['AR', 6]], [['CLmax', 1.2], ['W', 9000]], [['S', 700], ['W', 7100]]];
     const bad = []; let checked = 0;
     for (const pt of points) {
       for (let i = 0; i < 7; i++) for (const [key, dir] of [['ArrowUp', 1], ['ArrowDown', -1]]) {
@@ -107,61 +81,60 @@ const tests = {
         checked++;
         if (moved && Math.sign(delta) !== dir) bad.push(`${AXES[i]} ${key} went the wrong way at ${JSON.stringify(pt)}`);
         if (!moved) {
-          const drv = DRIVES[AXES[i]], lim = LIMITS[drv];
+          // allowed only if the input this handle drives is at its limit in that direction
+          const drv = { V: 'V', W: 'W', payload: 'W', D: 'V', n: 'V', S: 'S', Vs: 'S' }[AXES[i]];
+          const lim = { V: [80, 240], W: [5000, 16000], S: [200, 700] }[drv];
           const wantUp = (AXES[i] === 'Vs') ? -dir : dir; // higher stall speed means less wing
           const atLimit = wantUp > 0 ? a.st[drv] >= lim[1] : a.st[drv] <= lim[0];
-          // cruise drag: stopping at minimum drag or at either end of the speed range is correct
-          const dragStop = AXES[i] === 'D' && (a.st.V <= 40 || a.st.V >= 500 || Math.abs(a.st.V - a.r.Vmd) <= 1);
-          if (!atLimit && !dragStop) bad.push(`${AXES[i]} ${key} stuck at ${JSON.stringify(pt)}`);
+          const belowVmd = AXES[i] === 'D' && dir < 0 && Math.abs(a.st.V - Math.max(80, a.r.Vmd)) <= 1;
+          if (!atLimit && !belowVmd) bad.push(`${AXES[i]} ${key} stuck at ${JSON.stringify(pt)}`);
         }
       }
     }
     return { pass: bad.length === 0, detail: `${checked} presses, ${bad.length} wrong` + (bad.length ? ': ' + bad.slice(0, 3).join('; ') : '') };
   },
-  async influenceNegativeUsefulLoad(page) {
+  // Influence table with negative payload: no misleading numbers.
+  async influenceNegativePayload(page) {
     await set(page, [['S', 700], ['W', 5000]]);
-    const cells = await page.$$eval('#sens tbody tr', rows => rows.map(r => r.cells[2].textContent));
-    return { pass: cells.length === 5 && cells.every(c => c === '–'), detail: 'useful load column: ' + cells.join(' ') };
+    const cells = await page.$$eval('#sens tbody tr', rows => rows.map(r => r.cells[2].textContent + (r.cells[2].className ? '(' + r.cells[2].className + ')' : '')));
+    return { pass: cells.every(c => c.startsWith('–')), detail: 'payload column: ' + cells.join(' ') };
   },
+  // Reset should also clear a map selection.
   async resetClearsMapSelection(page) {
-    await page.click('#map g.node[aria-label="Useful load"]');
+    await page.click('#map g.node[aria-label="Payload"]');
     await page.click('#btnReset');
     const key = await page.textContent('#mapkey');
     return { pass: key.includes('Click a box'), detail: `map key after Reset: "${key.trim()}"` };
   },
+  // Screen readers get each handle's value.
   async handlesHaveValueText(page) {
     const t = await page.$$eval('#radar circle.handle', cs => cs.map(c => c.getAttribute('aria-valuetext')));
-    return { pass: t.length === 7 && t.every(Boolean), detail: `${t.length} handles, e.g. "${t[0]}"` };
+    return { pass: t.every(Boolean), detail: t[0] ? `e.g. "${t[0]}"` : 'no aria-valuetext' };
   },
+  // Every handle solve lands within one step of the driven input, at 60/80/120/140% of stock.
   async handleSolvesHitTarget(page) {
-    // every handle, at 30/60/150/300% of the reference, for three very different aircraft
-    const res = await page.evaluate(({ AXES, DRIVES, LIMITS }) => {
+    const res = await page.evaluate(() => {
+      const ids = ['V', 'W', 'payload', 'D', 'n', 'S', 'Vs'], drv = { V: 'V', W: 'W', payload: 'W', D: 'V', n: 'V', S: 'S', Vs: 'S' };
+      const step = { V: 1, W: 10, S: 1 }, lim = { V: [80, 240], W: [5000, 16000], S: [200, 700] };
       const get = id => (id === 'V' || id === 'W') ? window.__app.st[id] : window.__last[id];
-      const step = (d, v) => d === 'V' ? 1 : Math.pow(10, Math.floor(Math.log10(v)) - 3);
-      const bad = []; let n = 0, skipped = 0;
-      for (const preset of ['skyvan', 'c172', 'b737']) {
-        window.__app.loadPreset(preset); const base = {}; AXES.forEach(id => base[id] = get(id));
-        for (const id of AXES) for (const p of [30, 60, 150, 300]) {
-          window.__app.loadPreset(preset);
-          const target = base[id] * p / 100; window.__app.setInput(id, target); n++;
-          const d = DRIVES[id], v0 = window.__app.st[d], got = get(id);
-          if (v0 <= LIMITS[d][0] || v0 >= LIMITS[d][1]) { skipped++; continue; } // clamped: can't reach
-          if (id === 'D' && Math.abs(v0 - Math.max(40, window.__last.Vmd)) <= 1) { skipped++; continue; } // below min drag
-          const at = x => { window.__app.setInput(d, x); return get(id); };
-          const s0 = step(d, v0), lo = at(v0 - s0), hi = at(v0 + s0); window.__app.setInput(d, v0);
-          if (!((target - lo) * (target - hi) <= 0)) bad.push(`${preset} ${id}@${p}%: target ${target.toFixed(3)} got ${got.toFixed(3)}`);
-        }
+      const base = {}; document.getElementById('btnReset').click(); ids.forEach(id => base[id] = get(id));
+      const bad = []; let n = 0;
+      for (const id of ids) for (const p of [60, 80, 120, 140]) {
+        document.getElementById('btnReset').click();
+        const target = base[id] * p / 100; window.__app.setInput(id, target); n++;
+        const d = drv[id], v0 = window.__app.st[d], got = get(id);
+        if (v0 <= lim[d][0] || v0 >= lim[d][1]) continue; // clamped: can't reach, fine
+        if (id === 'D' && Math.abs(v0 - Math.max(80, window.__last.Vmd)) <= 1) continue; // below min drag: stops at Vmd
+        // the value one step either side of the driven input must bracket the target
+        const at = x => { window.__app.setInput(d, x); return get(id); };
+        const lo = at(v0 - step[d]), hi = at(v0 + step[d]); window.__app.setInput(d, v0);
+        if (!((target - lo) * (target - hi) <= 0)) bad.push(`${id}@${p}%: target ${target.toFixed(2)} got ${got.toFixed(2)}`);
       }
-      return { n, bad, skipped };
-    }, { AXES, DRIVES, LIMITS });
-    return { pass: res.bad.length === 0, detail: `${res.n} solves (${res.skipped} at a range limit), ${res.bad.length} off` + (res.bad.length ? ': ' + res.bad.slice(0, 3).join('; ') : '') };
+      return { n, bad };
+    });
+    return { pass: res.bad.length === 0, detail: `${res.n} solves, ${res.bad.length} off` + (res.bad.length ? ': ' + res.bad.slice(0, 3).join('; ') : '') };
   },
-  async stockValues(page) {
-    const r = (await state(page)).r;
-    const want = { Vs: [60.0, 0.05], b: [64.9, 0.05], WS: [33.5, 0.05], We: [7344, 0.5], U: [5156, 0.5], D: [1115, 0.5], Dp: [815, 0.5], Di: [300, 0.5], LDmax: [12.6, 0.05], n: [2.44, 0.005], VTAS: [148, 0.5], sigma: [0.7385, 0.0001] };
-    const bad = Object.entries(want).filter(([k, [v, tol]]) => Math.abs(r[k] - v) > tol).map(([k, [v]]) => `${k} ${r[k].toFixed(3)} (want ${v})`);
-    return { pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `all ${Object.keys(want).length} match the brief` };
-  },
+  // The page declares a tab icon and it decodes as an image (so browsers don't fall back to /favicon.ico).
   async tabIcon(page) {
     const res = await page.evaluate(() => new Promise(done => {
       const link = document.querySelector('link[rel="icon"]');
@@ -173,295 +146,85 @@ const tests = {
     }));
     return { pass: res.ok, detail: res.why };
   },
-
-  // ---------- new in this revision ----------
-  // The page's model must match the independent implementation written from docs/payload-range-spec.md.
-  async matchesIndependentImplementation(page) {
-    const cases = JSON.parse(fs.readFileSync(path.join(IND, 'cases.json'), 'utf8'));
-    const expected = JSON.parse(fs.readFileSync(path.join(IND, 'expected.json'), 'utf8'));
-    const got = await page.evaluate(cases => cases.map(c => { const r = model(c); return { id: c.id, r: JSON.parse(JSON.stringify(r)) }; }), cases);
-    let worst = 0, worstAt = '', compared = 0, skippedT = 0; const bad = [];
-    const cmp = (label, a, e, absTol) => { compared++; const err = Math.abs(a - e), rel = err / Math.max(Math.abs(e), 1e-9);
-      const score = Math.min(rel, err / absTol); if (score > worst) { worst = score; worstAt = `${label}: page ${a} vs independent ${e}`; }
-      if (!(err <= absTol || rel <= 1e-9)) bad.push(`${label}: page ${a} vs ${e}`); };
-    for (const { id, r } of got) {
-      const e = expected[id];
-      for (const k of ['Vs', 'b', 'WS', 'We', 'U', 'q', 'Dp', 'Dc', 'Di', 'D', 'LD', 'LDmax', 'Vmd', 'n']) cmp(`${id}.${k}`, r[k], e.sizing[k], 1e-9);
-      for (const k of ['sigma', 'theta', 'VTAS', 'a', 'M', 'dCD']) cmp(`${id}.${k}`, r[k], e.atmosphere[k], 1e-12);
-      cmp(`${id}.ff0`, r.ff0, e.ff0, 1e-9); cmp(`${id}.PL`, r.PL, e.PL, 1e-6); cmp(`${id}.Pstar`, r.Pstar, e.Pstar, 1e-6);
-      cmp(`${id}.Vbest`, r.Vbest, e.Vbest, 0.02);   // both use a golden-section search to 0.01 kt
-      for (const P of ['A', 'B', 'C', 'D']) {
-        const m = r.pr[P], x = e.points[P], U0 = e.sizing.U > 0;
-        cmp(`${id}.${P}.payload`, m.P, x.payload, 1e-6); cmp(`${id}.${P}.fuel`, m.F, x.fuel, 1e-6);
-        // with no useful load the spec leaves takeoff weight and segment values undefined (page: empty weight, independent: 0)
-        if (!U0) { skippedT++; cmp(`${id}.${P}.range`, m.R, x.range, 0.01); continue; }
-        cmp(`${id}.${P}.takeoff`, m.T, x.takeoffWeight, 1e-6); cmp(`${id}.${P}.taxi`, m.Ft, x.taxiFuel, 1e-6);
-        cmp(`${id}.${P}.climbFuel`, m.Fcl, x.climbFuel, 1e-6); cmp(`${id}.${P}.climbDist`, m.Xc, x.climbDist, 1e-6);
-        cmp(`${id}.${P}.reserve`, m.Fr, x.reserve, 0.02); cmp(`${id}.${P}.descentFuel`, m.Fde, x.descentFuel, 0.01); cmp(`${id}.${P}.descentDist`, m.Xd, x.descentDist, 1e-4);
-        cmp(`${id}.${P}.cruiseFuel`, m.Fcr, x.cruiseFuel, 0.05); cmp(`${id}.${P}.cruiseDist`, m.Rcr, x.cruiseDist, 0.01); cmp(`${id}.${P}.range`, m.R, x.range, 0.01);
-      }
-    }
-    return { pass: bad.length === 0, detail: `${got.length} cases, ${compared} values (${skippedT} undefined takeoff weights skipped), ${bad.length} mismatched` + (bad.length ? ': ' + bad.slice(0, 3).join('; ') : `; closest call ${worstAt}`) };
-  },
-  // Every preset loads cleanly, becomes the reference, and draws real numbers everywhere.
-  async presetsLoadCleanly(page) {
-    const res = await page.evaluate(() => Object.keys(PRESETS).map(id => {
-      window.__app.loadPreset(id);
-      const txt = document.body.innerText, pcts = [...document.querySelectorAll('#radar .ax-d')].map(t => t.textContent);
-      const prPath = document.querySelector('#prchart path.ct');
-      return { id, nan: /NaN|Infinity|undefined/.test(txt), allRef: pcts.every(t => t === 'reference'), pr: !!prPath, title: document.getElementById('subline').textContent.includes(PRESETS[id].name),
-        selected: document.getElementById('preset').value === id, RB: window.__last.RB, RD: window.__last.RD };
-    }));
-    const bad = res.filter(x => x.nan || !x.allRef || !x.pr || !x.title || !x.selected || !(x.RD > 0));
-    return { pass: bad.length === 0, detail: res.map(x => `${x.id} ferry ${x.RD.toFixed(0)} nmi`).join(', ') + (bad.length ? ' | BAD: ' + JSON.stringify(bad) : '') };
-  },
-  // Log sliders reach both ends of the much wider ranges, and typed values survive.
-  async wideLogSliders(page) {
-    const out = await page.evaluate(() => {
-      const r = {}; const slide = (id, pos) => { const s = document.getElementById('s_' + id); s.value = pos; s.dispatchEvent(new Event('input', { bubbles: true })); return window.__app.st[id]; };
-      r.Wmin = slide('W', 0); r.Wmax = slide('W', 1000); r.Smin = slide('S', 0); r.Smax = slide('S', 1000);
-      window.__app.loadPreset('skyvan'); r.Wmid = slide('W', 500);
-      window.__app.setInput('W', 174200); r.typed = window.__app.st.W; r.box = document.getElementById('n_W').value;
-      return r;
-    });
-    const ok = out.Wmin === 500 && out.Wmax === 1300000 && out.Smin === 30 && out.Smax === 10000 && Math.abs(out.Wmid - Math.sqrt(500 * 1300000)) / out.Wmid < 0.001 && out.typed === 174200 && out.box === '174200';
-    return { pass: ok, detail: `W slider ${out.Wmin} to ${out.Wmax} lb (middle ${out.Wmid}), S ${out.Smin} to ${out.Smax} ft², typed 174200 -> ${out.typed} (box ${out.box})` };
-  },
-  // Charts rescale so the cruise point and every payload-range corner are on the plot, for every preset.
-  async chartsScaleToAircraft(page) {
-    const res = await page.evaluate(() => Object.keys(PRESETS).map(id => {
-      window.__app.loadPreset(id); const r = window.__last, ax = window.__curveAxes;
-      const inside = (sel, box) => [...document.querySelectorAll(sel)].every(c => { const x = +c.getAttribute('cx'), y = +c.getAttribute('cy'); return x >= box[0] - 0.5 && x <= box[2] + 0.5 && y >= box[1] - 0.5 && y <= box[3] + 0.5; });
-      return { id, cruiseOn: window.__app.st.V < ax.vmax && r.D < ax.dmax, prOn: inside('#prchart circle', [62, 18, 620, 296]), dragOn: inside('#curve circle', [62, 14, 884, 286]) };
-    }));
-    const bad = res.filter(x => !x.cruiseOn || !x.prOn || !x.dragOn);
-    return { pass: bad.length === 0, detail: `${res.length} presets checked` + (bad.length ? ': ' + JSON.stringify(bad) : ', all points inside both plots') };
-  },
-  // Propeller/jet switch shows the right inputs and uses the right fuel law.
-  async propJetSwitch(page) {
-    const vis = () => page.evaluate(() => ['cp', 'eta', 'ct'].map(id => !document.getElementById('n_' + id).closest('.row').hidden));
-    // range ÷ ∫dw/D must equal the propulsion constant: 550η/(1.688 c_p) for prop, V_true/c_t for jet
-    const constant = s => { const m = s.r.pr.C, k = Math.sqrt(s.r.k2 / s.r.k0), J = (Math.atan(m.w1 * k) - Math.atan(m.w3 * k)) / Math.sqrt(s.r.k0 * s.r.k2); return m.Rcr / J; };
-    const a = await vis(), sa = await state(page);
-    await page.click('#bJet');
-    const b = await vis(), sb = await state(page);
-    await page.click('#bProp');
-    const c = await vis();
-    const kProp = constant(sa), wantProp = 550 * sa.st.eta / (1.688 * sa.st.cp), kJet = constant(sb), wantJet = sb.r.VTAS / sb.st.ct;
-    const ok = a.join() === 'true,true,false' && b.join() === 'false,false,true' && c.join() === a.join() && sb.st.prop === 'jet' && sb.r.RC !== sa.r.RC
-      && Math.abs(kProp / wantProp - 1) < 1e-9 && Math.abs(kJet / wantJet - 1) < 1e-9;
-    return { pass: ok, detail: `rows shown prop ${a} / jet ${b}; range constant prop ${kProp.toFixed(3)} (want ${wantProp.toFixed(3)}), jet ${kJet.toFixed(3)} (want ${wantJet.toFixed(3)})` };
-  },
-  // "Make this the reference" rebases the radar and tiles on the current point.
-  async makeReference(page) {
-    await set(page, [['W', 15000], ['S', 420]]);
-    const before = await page.$$eval('#radar .ax-d', t => t.map(x => x.textContent));
-    await page.click('#btnRef');
-    const after = await page.$$eval('#radar .ax-d', t => t.map(x => x.textContent));
-    const sub = await page.textContent('#subline');
-    await page.click('#btnReset');
-    const back = await page.$$eval('#radar .ax-d', t => t.map(x => x.textContent));
-    const ok = before.some(t => t !== 'reference') && after.every(t => t === 'reference') && sub.includes('your aircraft') && back.every(t => t === 'reference');
-    return { pass: ok, detail: `before: ${before.slice(0, 3).join(', ')}…; after: ${after.slice(0, 3).join(', ')}…; subtitle mentions "your aircraft": ${sub.includes('your aircraft')}` };
-  },
-  // Editing the empty weight solves the fixed fraction, and the new value is what the model uses.
-  async emptyWeightSolvesFraction(page) {
-    await set(page, [['We', 8000]]);
-    const s = await state(page);
-    const ok = Math.abs(s.r.We - 8000) < 0.02 && Math.abs(s.st.fe - (8000 - 6 * 373) / 12500) < 1e-6;
-    return { pass: ok, detail: `empty weight ${s.r.We.toFixed(2)} lb, fe ${s.st.fe}` };
-  },
-  // The payload-range diagram is a monotone staircase: range never shrinks from B to C to D, payload never grows.
-  async payloadRangeShape(page) {
-    const res = await page.evaluate(() => {
-      const bad = []; let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      const lim = { W: [500, 1300000], S: [30, 10000], V: [40, 500], AR: [3, 40], h: [0, 51000], Fmax: [10, 400000], Pmax: [10, 300000], WL: [500, 1300000], tr: [0, 120], ft: [0, 0.03], roc: [0, 6000], Mcrit: [0.5, 0.95], CD0: [0.008, 0.12] };
-      for (let i = 0; i < 400; i++) {
-        window.__app.loadPreset(Object.keys(PRESETS)[i % 5]);
-        Object.entries(lim).forEach(([k, [a, b]]) => { if (rnd() < 0.5) window.__app.setInput(k, ['W', 'S', 'Fmax', 'Pmax', 'WL'].includes(k) ? a * Math.pow(b / a, rnd()) : a + rnd() * (b - a)); });
-        if (rnd() < 0.3) window.__app.st.prop = 'jet';
-        const r = model(window.__app.st), p = r.pr;
-        const pts = [p.A, p.B, p.C, p.D];
-        if (pts.some(x => x.P < -1e-9 || x.F < -1e-9 || x.R < 0 || !isFinite(x.R))) bad.push('negative or non-finite at ' + i);
-        // B ≤ C always; C ≤ D except for the documented glide quirk, which can never be bigger than the descent-distance difference
-        if (!(p.B.R <= p.C.R + 1e-9 && p.C.R <= p.D.R + Math.max(0, p.C.Xd - p.D.Xd) + 1e-9)) bad.push(`range order ${p.B.R.toFixed(1)}, ${p.C.R.toFixed(1)}, ${p.D.R.toFixed(1)} at ${i}`);
-        if (!(p.A.P >= p.B.P - 1e-9 && p.B.P >= p.C.P - 1e-9 && p.C.P >= p.D.P - 1e-9)) bad.push('payload order at ' + i);
-        if (r.U > 0 && pts.some(x => x.T > window.__app.st.W + 1e-6)) bad.push('over max takeoff weight at ' + i);
-        if (r.U > 0 && pts.some(x => x.P > 0 && x.w2 > window.__app.st.WL + 0.05)) bad.push('lands above max landing weight at ' + i);
-        // fuel and distance bookkeeping must close exactly for every flyable point
-        pts.forEach((x, j) => { if (x.Fcr > 0) {
-          if (Math.abs(x.F - (x.Ft + x.Fcl + x.Fde + x.Fr + x.Fcr)) > 1e-6) bad.push(`fuel does not add up at ${i}/${j}`);
-          if (Math.abs(x.R - (x.Xc + x.Rcr + x.Xd)) > 1e-9) bad.push(`distance does not add up at ${i}/${j}`); } });
-      }
-      return bad;
-    });
-    return { pass: res.length === 0, detail: `400 random aircraft, ${res.length} problems` + (res.length ? ': ' + res.slice(0, 3).join('; ') : '') };
-  },
-  // Reviewer finding 1: stepping a number box with the arrow keys, then Enter, shows the stored (rounded) value.
-  async numberBoxShowsStoredValueAfterStepping(page) {
-    await page.evaluate(() => window.__app.loadPreset('c172'));
-    await page.focus('#n_h'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter');
-    const s = await state(page), box = await page.inputValue('#n_h');
-    return { pass: s.st.h === 8500 && box === '8500', detail: `altitude stored ${s.st.h}, box shows ${box} (want 8500 for both)` };
-  },
-  // Reviewer finding 2: number-box arrows step by the control's step, not by 1.
-  async numberBoxSmallSteps(page) {
-    const out = [];
-    for (const [id, want] of [['CD0', 0.039], ['e', 0.71], ['cp', 0.59], ['eta', 0.79], ['CLmax', 2.70]]) {
-      await page.evaluate(() => { document.getElementById('btnReset').click(); document.getElementById('constBox').open = true; }); // constants live in a collapsible block
-      await page.focus('#n_' + id); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-      const v = (await state(page)).st[id]; out.push(`${id} ${v}`);
-      if (Math.abs(v - want) > 1e-9) return { pass: false, detail: `${id}: ArrowDown gave ${v}, want ${want}` };
-    }
-    return { pass: true, detail: 'ArrowDown: ' + out.join(', ') };
-  },
-  // Reviewer finding 3: log sliders report the real value to screen readers.
-  async logSlidersHaveValueText(page) {
-    const t = await page.evaluate(() => ['W', 'S', 'We', 'Fmax', 'Pmax'].map(id => document.getElementById('s_' + id).getAttribute('aria-valuetext')));
-    return { pass: t.join('|') === '12500 lb|373 ft²|7344 lb|2262 lb|4600 lb', detail: t.join(', ') };
-  },
-  // Reviewer finding 5: changing preset while a number box holds unapplied text discards that text.
-  async presetChangeDiscardsTyping(page) {
-    await page.click('#n_W', { clickCount: 3 }); await page.keyboard.type('9999');
-    await page.evaluate(() => window.__app.loadPreset('c172'));    // focus stays in the box
-    const mid = await page.inputValue('#n_W');
-    await page.keyboard.press('Tab');                                 // blur: must not apply stale text
-    const s = await state(page), box = await page.inputValue('#n_W');
-    return { pass: mid === '2550' && s.st.W === 2550 && box === '2550', detail: `box after preset change ${mid}; after blur W ${s.st.W}, box ${box}` };
-  },
-  // ---------- new in REVD ----------
-  // With compressibility out of the way, best-range speed is the textbook answer: Vmd for a prop, 3^¼·Vmd for a jet (Vmd at the search weight).
-  async bestRangeTextbook(page) {
-    const res = await page.evaluate(() => ['skyvan', 'c172', 'kingair350', 'atr72', 'b737'].flatMap(id => ['prop', 'jet'].map(prop => {
-      const p = Object.assign({}, PRESETS[id], { prop, Mcrit: 5 }), r = model(p), VmdW0 = r.Vmd * Math.sqrt(1 - p.ft);
-      const want = prop === 'prop' ? VmdW0 : Math.pow(3, 0.25) * VmdW0, lo = Math.max(40, 1.1 * r.Vs);
-      return { id: id + '/' + prop, got: r.Vbest, want, skip: want < lo || want > 500 };
-    })));
-    const checked = res.filter(x => !x.skip), bad = checked.filter(x => Math.abs(x.got - x.want) > 0.05);
-    return { pass: bad.length === 0 && checked.length >= 8, detail: `${checked.length} cases, worst ${Math.max(...checked.map(x => Math.abs(x.got - x.want))).toFixed(4)} kt` + (bad.length ? ': ' + JSON.stringify(bad[0]) : '') };
-  },
-  // The button flies the best-range speed, and that never shortens ferry range.
-  async bestRangeButton(page) {
-    const out = [];
-    for (const id of ['skyvan', 'kingair350', 'atr72', 'b737']) {
-      await page.evaluate(id => window.__app.loadPreset(id), id);
-      const a = await state(page);
-      await page.click('#btnBest');
-      const b = await state(page), btn = await page.$eval('#btnBest', x => ({ ariaOff: x.getAttribute('aria-disabled') === 'true', focused: document.activeElement === x, enabled: !x.disabled }));
-      // review finding: the button must keep keyboard focus after use (aria-disabled, not disabled)
-      out.push({ id, V: `${a.st.V}→${b.st.V}`, ferry: `${a.r.RD.toFixed(0)}→${b.r.RD.toFixed(0)}`, ok: b.st.V === Math.round(a.r.Vbest) && btn.ariaOff && btn.focused && btn.enabled && b.r.RD >= a.r.RD - 1e-6 });
-    }
-    return { pass: out.every(x => x.ok), detail: out.map(x => `${x.id} V ${x.V} kt, ferry ${x.ferry} nmi`).join('; ') };
-  },
-  // Compressibility appears only above the critical Mach, shows on the chart and math, and warns past divergence.
-  async compressibility(page) {
-    await page.evaluate(() => window.__app.loadPreset('b737'));
-    const a = await state(page), lgA = await page.$eval('#lgDc', x => !x.hidden);
-    await set(page, [['V', 300]]);
-    const b = await state(page), warn = await page.textContent('#prWarn'), lgB = await page.$eval('#lgDc', x => !x.hidden);
-    await page.evaluate(() => window.__app.loadPreset('skyvan'));
-    const c = await state(page);
-    const ok = a.r.Dc > 0 && b.r.Dc > 5 * a.r.Dc && b.r.M > a.r.M && warn.includes('drag divergence') && lgA && lgB && c.r.Dc === 0;
-    return { pass: ok, detail: `737 at 250 kt: Mach ${a.r.M.toFixed(3)}, ${a.r.Dc.toFixed(0)} lb; at 300 kt: Mach ${b.r.M.toFixed(3)}, ${b.r.Dc.toFixed(0)} lb, warning shown ${warn.includes('drag divergence')}; Skyvan ${c.r.Dc} lb` };
-  },
-  // The landing-weight limit caps payload, is reported, and every corner then lands at or below it.
-  async landingWeightLimit(page) {
-    await page.evaluate(() => window.__app.loadPreset('atr72'));
-    await set(page, [['WL', 44000]]);
-    const s = await state(page), warn = await page.textContent('#prWarn');
-    const landed = ['A', 'B', 'C'].map(k => s.r.pr[k].w2);
-    const ok = s.r.Pstar < s.st.Pmax && Math.abs(s.r.pr.B.P - s.r.Pstar) < 1e-6 && landed.every(w => w <= 44000 + 0.05) && warn.includes('landing weight') && Math.abs(landed[0] - 44000) < 0.05;
-    return { pass: ok, detail: `payload capped ${s.st.Pmax} → ${s.r.Pstar.toFixed(0)} lb; landing weights A/B/C ${landed.map(w => w.toFixed(1)).join(', ')} lb; warning ${warn.includes('landing weight')}` };
-  },
-  // Review finding: with no speed between stall and 500 kt, there is no best-range speed and the button does nothing.
-  async noBestRangeSpeed(page) {
-    await set(page, [['W', 1300000], ['S', 30]]);
-    const a = await state(page), text = await page.textContent('#btnBest');
-    await page.click('#btnBest', { force: true }); // Playwright skips aria-disabled buttons; force it to prove the click is a no-op
-    const b = await state(page), body = await page.evaluate(() => document.body.innerText);
-    const ok = a.r.Vbest === null && text.includes('No best-range speed') && b.st.V === a.st.V && !/NaN|Infinity|undefined/.test(body);
-    return { pass: ok, detail: `stall ${a.r.Vs.toFixed(0)} kt; Vbest ${a.r.Vbest}; button "${text}"; V after click ${b.st.V} (was ${a.st.V})` };
-  },
-  // Review findings: stock presets show no false alarms; the landing-weight cap reads as a note.
-  async presetWarningsAreFair(page) {
-    const res = await page.evaluate(() => Object.keys(PRESETS).map(id => { window.__app.loadPreset(id); return [id, document.getElementById('prWarn').textContent]; }));
-    const div = res.filter(([, w]) => w.includes('drag divergence')), c172 = res.find(([id]) => id === 'c172')[1];
-    const ok = div.length === 0 && /lands at or under its maximum landing weight/.test(c172) && !/limited to/.test(c172);
-    return { pass: ok, detail: res.map(([id, w]) => `${id}: ${w ? '"' + w.slice(0, 60) + '…"' : 'none'}`).join('; ') };
-  },
-  // Climb and descent: no segments at sea level or with zero climb rate; more climb rate means less climb fuel for a given altitude.
-  async climbDescentSegments(page) {
-    const r = await page.evaluate(() => {
-      const base = PRESETS.skyvan, f = o => model(Object.assign({}, base, o)).pr.C;
-      return { sea: f({ h: 0 }), zero: f({ roc: 0 }), slow: f({ roc: 500 }), fast: f({ roc: 2000 }) };
-    });
-    const ok = r.sea.Fcl === 0 && r.sea.Xc === 0 && r.sea.Fde === 0 && r.zero.Fcl === 0 && r.zero.Fde > 0 && r.slow.Fcl > r.fast.Fcl && r.slow.Xc > r.fast.Xc;
-    return { pass: ok, detail: `Skyvan full tanks: sea level climb ${r.sea.Fcl} lb; climb at 500 vs 2,000 ft/min: ${r.slow.Fcl.toFixed(0)} vs ${r.fast.Fcl.toFixed(0)} lb, ${r.slow.Xc.toFixed(0)} vs ${r.fast.Xc.toFixed(0)} nmi` };
-  },
-  // Random walks over the full new ranges never put NaN on screen or throw.
-  async noNaNAnywhere(page) {
-    const res = await page.evaluate(() => {
-      let seed = 99; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; const bad = [];
-      const ids = ['W', 'S', 'V', 'Vs', 'CLmax', 'AR', 'h', 'CD0', 'e', 'Mcrit', 'We', 'ws', 'cp', 'eta', 'ct', 'Fmax', 'Pmax', 'WL', 'tr', 'ft', 'roc', 'U', 'D', 'n'];
-      for (let i = 0; i < 300; i++) {
-        const id = ids[Math.floor(rnd() * ids.length)], R = { U: [-5e4, 5e5], D: [10, 1e5], n: [1, 6] }[id];
-        const inp = document.getElementById('n_' + id);
-        const v = R ? R[0] + rnd() * (R[1] - R[0]) : (+inp.min) + rnd() * ((+inp.max) - (+inp.min));
-        if (R) window.__app.setInput(id, v); else { inp.value = v; inp.dispatchEvent(new Event('change')); }
-        if (rnd() < 0.1) document.getElementById(rnd() < 0.5 ? 'bJet' : 'bProp').click();
-        if (/NaN|Infinity|undefined/.test(document.body.innerText)) { bad.push(`after ${id}=${v}`); break; }
-      }
-      return bad;
-    });
-    return { pass: res.length === 0, detail: `300 random edits` + (res.length ? ', NaN on screen ' + res[0] : ', no NaN, Infinity or undefined on screen') };
+  // Stock values from the brief.
+  async stockValues(page) {
+    const r = (await state(page)).r;
+    const want = { Vs: [60.0, 0.05], b: [64.9, 0.05], WS: [33.5, 0.05], We: [7344, 0.5], payload: [5156, 0.5], D: [1115, 0.5], Dp: [815, 0.5], Di: [300, 0.5], LDmax: [12.6, 0.05], n: [2.44, 0.005] };
+    const bad = Object.entries(want).filter(([k, [v, tol]]) => Math.abs(r[k] - v) > tol).map(([k, [v]]) => `${k} ${r[k].toFixed(3)} (want ${v})`);
+    return { pass: bad.length === 0, detail: bad.length ? bad.join('; ') : 'all 10 match the brief' };
   },
 };
 
-// Narrow screen, every preset: no sideways scroll and no console errors.
+// Narrow screen: no sideways scroll and no console errors.
 async function narrowCheck(browser, f) {
   const page = await open(browser, f, 400);
-  const widths = await page.evaluate(() => Object.keys(PRESETS).map(id => { window.__app.loadPreset(id); return document.documentElement.scrollWidth; }));
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
   await page.click('#map g.node[aria-label="Wing area"]');
-  const r = { pass: widths.every(w => w <= 400) && page.errors.length === 0, detail: `scrollWidth per preset ${widths.join(', ')}; errors ${page.errors.length}` + (page.errors.length ? ': ' + page.errors.join(' | ') : '') };
+  const r = { pass: sw <= 400 && page.errors.length === 0, detail: `scrollWidth ${sw}, errors ${page.errors.length}` + (page.errors.length ? ': ' + page.errors.join(' | ') : '') };
   await page.close();
   return r;
 }
 
-// Sizing model regression against an earlier page (REVB-style model(W,V,S,CLmax,AR)), Skyvan constants.
+// Random walks through every control; everything rendered must match the reference exactly
+// (model numbers, tiles, radar labels, drag chart, map, influence table, math table) wherever payload > 0.
 async function regression(browser, ref, cur) {
   const A = await open(browser, ref), B = await open(browser, cur);
+  const ranges = { W: [5000, 16000], V: [80, 240], S: [200, 700], CLmax: [1.2, 3.0], AR: [6, 16], Vs: [40, 90], payload: [-2000, 9000], D: [500, 3000], n: [1.5, 4] };
   let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const keys = ['Vs', 'b', 'c', 'CLa', 'WS', 'q', 'mu', 'Kg', 'n', 'Dp', 'Di', 'D', 'LD', 'LDmax', 'Vmd', 'We'];
-  let worst = 0, n = 0; const bad = [];
-  for (let i = 0; i < 500; i++) {
-    const x = { W: 5000 + rnd() * 11000, V: 80 + rnd() * 160, S: 200 + rnd() * 500, CLmax: 1.2 + rnd() * 1.8, AR: 6 + rnd() * 10 };
-    const a = await A.evaluate(x => { const r = model(x.W, x.V, x.S, x.CLmax, x.AR); r.U = r.payload; return r; }, x);
-    const b = await B.evaluate(x => model(Object.assign({}, PRESETS.skyvan, x)), x);
-    for (const k of keys.concat(['U'])) { n++; const rel = Math.abs(a[k] - b[k]) / Math.max(1e-12, Math.abs(a[k])); worst = Math.max(worst, rel); if (rel > 1e-12) bad.push(`${k} at ${JSON.stringify(x)}`); }
+  const snap = page => page.evaluate(() => {
+    const r = Object.assign({}, window.__last); delete r.hp;
+    const s = window.__app.st;
+    return { r, st: { W: s.W, V: s.V, S: s.S, CLmax: s.CLmax, AR: s.AR },
+      tiles: document.querySelector('#tiles').innerHTML, radar: [...document.querySelectorAll('#radar text')].map(t => t.textContent + '|' + t.style.fill).join(';'),
+      shape: document.querySelector('#radar .shape').getAttribute('points'), curve: document.querySelector('#curve').innerHTML,
+      map: [...document.querySelectorAll('#map text, #map .hot')].map(e => e.textContent || e.getAttribute('class')).join(';'),
+      sens: document.querySelector('#sens').innerHTML, math: document.querySelector('#math tbody').innerHTML };
+  });
+  let steps = 0, skipped = 0; const diffs = [];
+  for (let walk = 0; walk < 40; walk++) {
+    const seq = [];
+    for (let k = 0; k < 6; k++) { const keys = Object.keys(ranges), id = keys[Math.floor(rnd() * keys.length)], [a, b] = ranges[id]; seq.push([id, a + rnd() * (b - a)]); }
+    for (const p of [A, B]) await p.evaluate(() => document.getElementById('btnReset').click());
+    for (const s of seq) {
+      await set(A, [s]); await set(B, [s]); steps++;
+      const a = await snap(A), b = await snap(B);
+      if (!(a.r.payload > 0)) { skipped++; if (JSON.stringify(a.st) !== JSON.stringify(b.st)) diffs.push('state ' + JSON.stringify(s)); continue; }
+      for (const k of Object.keys(a)) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) diffs.push(`${k} after ${s[0]}=${s[1].toFixed(2)}`);
+    }
   }
   const errs = A.errors.concat(B.errors);
   await A.close(); await B.close();
-  return { pass: bad.length === 0 && errs.length === 0, detail: `500 random points, ${n} values, worst relative difference ${worst.toExponential(1)}` + (bad.length ? ': ' + bad.slice(0, 3).join('; ') : '') + (errs.length ? ' ERRORS: ' + errs.join(' | ') : '') };
+  return { pass: diffs.length === 0 && errs.length === 0,
+    detail: `${steps} random steps, ${diffs.length} differences (${skipped} steps with payload ≤ 0 compared on state only)` + (diffs.length ? ': ' + diffs.slice(0, 4).join('; ') : '') + (errs.length ? ' ERRORS: ' + errs.join(' | ') : '') };
 }
 
 (async () => {
   const launch = process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : { channel: process.env.BROWSER_CHANNEL || 'msedge' };
   const browser = await chromium.launch({ ...launch, headless: true });
+  const files = reference ? { reference, page: target } : { page: target };
   const rows = [];
   for (const [name, fn] of Object.entries(tests)) {
-    const page = await open(browser, target);
-    let res;
-    try { res = await fn(page); } catch (e) { res = { pass: false, detail: 'threw: ' + e.message.split('\n')[0] }; }
-    if (page.errors.length) { res.pass = false; res.detail += ' [page errors: ' + page.errors.join(' | ') + ']'; }
-    await page.close();
-    rows.push({ name, ...res });
+    const row = { name };
+    for (const [label, f] of Object.entries(files)) {
+      const page = await open(browser, f);
+      try { row[label] = await fn(page); } catch (e) { row[label] = { pass: false, detail: 'threw: ' + e.message.split('\n')[0] }; }
+      if (page.errors.length) { row[label].pass = false; row[label].detail += ' [page errors: ' + page.errors.join(' | ') + ']'; }
+      await page.close();
+    }
+    rows.push(row);
   }
-  rows.push({ name: 'At 400 px, every preset: no sideways scroll, no console errors', ...(await narrowCheck(browser, target)) });
-  if (reference) rows.push({ name: 'Regression: sizing model identical to the reference page', ...(await regression(browser, reference, target)) });
+  rows.push({ name: 'At 400 px: no sideways scroll, no console errors', page: await narrowCheck(browser, target) });
+  if (reference) rows.push({ name: 'Regression: page renders exactly what the reference does', page: await regression(browser, reference, target) });
   await browser.close();
 
   let failed = 0;
-  for (const r of rows) { console.log(`${r.pass ? 'PASS' : 'FAIL'}  ${r.name}\n      ${r.detail}`); if (!r.pass) failed++; }
-  console.log(`\n${failed ? failed + ' of ' + rows.length + ' checks failed' : 'All ' + rows.length + ' checks passed'} on ${path.basename(target)}.`);
+  for (const r of rows) {
+    console.log('\n## ' + r.name);
+    for (const label of Object.keys(files)) if (r[label]) {
+      console.log(`  ${label}: ${r[label].pass ? 'PASS' : 'FAIL'}  ${r[label].detail}`);
+      if (label === 'page' && !r[label].pass) failed++;
+    }
+  }
+  console.log(`\n${failed ? failed + ' check(s) failed' : 'All checks passed'} on ${path.basename(target)}.`);
   process.exit(failed ? 1 : 0);
 })();

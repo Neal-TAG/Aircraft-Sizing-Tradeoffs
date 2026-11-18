@@ -1,8 +1,6 @@
-﻿# Aircraft Sizing Trade-offs
+# Aircraft Sizing Trade-offs
 
-An interactive page that shows how the main aircraft sizing quantities affect each other: gross weight, wing area, cruise speed, maximum lift coefficient, aspect ratio, stall speed, altitude, fuel and payload. Change one value and watch the physics move the rest, down to a rough payload-range diagram. Ranges cover a light single up to a narrow-body jet. It starts at the stock Short SC.7 Skyvan Series 3 (powered), with presets for the Cessna 172S, King Air 350, ATR 72-600 and Boeing 737-800.
-
-Live: https://neal-tag.github.io/Aircraft-Sizing-Tradeoffs/
+An interactive page that shows how the main aircraft sizing quantities affect each other: gross weight, wing area, cruise speed, maximum lift coefficient, aspect ratio and stall speed. Change one value and watch the physics move the rest. It starts at the stock Short SC.7 Skyvan Series 3 (powered).
 
 It is a teaching and early-trade tool, not a design tool.
 
@@ -10,10 +8,8 @@ It is a teaching and early-trade tool, not a design tool.
 
 Open `index.html` in a browser. It is one self-contained file with no build step; the only outside request is Google Fonts.
 
-- **Control rail (left):** every input, grouped into wing and weight, cruise, engines and fuel, mission and limits, and aircraft constants. It stays in view while the results scroll. Sliders and typed values: Enter applies, Esc cancels. The aircraft menu loads a preset; "Make reference" compares against your own design instead.
-- **Readout strip:** range, useful load, drag, fuel flow and Mach against the reference, pinned to the top while you scroll.
-- **Radar chart:** drag any of the seven handles, or focus one and use the arrow keys. Log scale, 25% to 400% of the reference. Beside it, a spec sheet of derived values.
-- **Payload and range:** the diagram and its corner points, with a best-range speed button.
+- **Radar chart:** drag any of the seven handles, or focus one and use the arrow keys.
+- **Controls:** sliders and typed values. Enter applies, Esc cancels.
 - **Drag against speed:** parasite, induced and total drag, with the stall, minimum drag and cruise points marked.
 - **Dependency map:** click a box to see what affects it and what it affects.
 - **Influence table:** % change in each result for a 1% change in each input.
@@ -23,13 +19,9 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 | File | What it is |
 |---|---|
-| `index.html` | The page (REVE) |
-| `BRIEF.md` | Full spec: equations, inputs and ranges, layout, behaviour, and revision history |
-| `docs/payload-range-spec.md` | Altitude, fuel-flow and payload-range math |
-| `docs/presets.md` | Preset values, sources, estimates, and model-versus-published comparison |
+| `index.html` | The page (REVB) |
+| `BRIEF.md` | Full spec: equations, constants, defaults and their sources, layout, behaviour, and the REVA to REVB change log |
 | `tests/ui.test.js` | Headless browser checks |
-| `tests/independent/` | A separate implementation of the spec, with test cases and expected outputs that the tests compare against |
-| `tests/presets-report.js` | Prints each preset next to published figures |
 
 ## Tests
 
@@ -40,7 +32,7 @@ npm install
 npm test
 ```
 
-To compare against an earlier revision, pass it as a reference. This adds a regression pass confirming the sizing model gives identical numbers:
+To compare against an earlier revision, pass it as a reference. Every check then runs on both pages, plus a regression pass that confirms they render the same output:
 
 ```
 git show HEAD~1:index.html > old.html
@@ -49,4 +41,4 @@ node tests/ui.test.js index.html old.html
 
 ## Limits
 
-Rough compressibility, a simple climb and descent, no winds, and an empty-weight rule fitted through one point per aircraft, so results are trends, not predictions. See `BRIEF.md` for the full list.
+Sea level only. The drag coefficient, span efficiency and empty-weight rule are fixed and fitted to one aircraft, so results away from the start point are trends, not predictions. See `BRIEF.md` for the full list.
