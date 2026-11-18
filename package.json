@@ -1,0 +1,12 @@
+{
+  "name": "aircraft-sizing-tradeoffs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive aircraft sizing trade-offs page, starting from the stock Short SC.7 Skyvan Series 3.",
+  "scripts": {
+    "test": "node tests/ui.test.js index.html"
+  },
+  "devDependencies": {
+    "playwright-core": "1.48.2"
+  }
+}
