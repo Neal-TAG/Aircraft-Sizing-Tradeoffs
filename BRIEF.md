@@ -5,7 +5,7 @@
 An interactive web page that shows how the main aircraft sizing quantities affect each other, from a light single to a narrow-body jet. Change one value and see how the physics moves the others, including a rough payload-range diagram. It is a teaching and early-trade tool, not a design tool.
 
 - Live pages: https://neal-tag.github.io/Aircraft-Sizing-Tradeoffs/ (public, serves `main`) and https://claude.ai/artifact/8i9AsJkd8AxCoPAtvNRe55 (private unless shared).
-- Reference implementation: `index.html` in this repository, currently REVC. Where the brief and the code disagree, the code is what shipped. See "Revision history".
+- Reference implementation: `index.html` in this repository, currently REVD. Where the brief and the code disagree, the code is what shipped. See "Revision history".
 - Format: one self-contained HTML file. No libraries. Inline SVG for all drawings. The only outside request is Google Fonts.
 - Starting point: the stock Short SC.7 Skyvan Series 3, powered. Four other presets: Cessna 172S, King Air 350, ATR 72-600 and Boeing 737-800 (values and sources in `docs/presets.md`).
 - Payload-range model: `docs/payload-range-spec.md`.
@@ -25,6 +25,7 @@ Per-aircraft constants, editable under "Aircraft constants" and set by each pres
 |---|---|---|---|
 | CD0 | 0.040 | 0.008 to 0.12 | Zero-lift drag coefficient on wing area |
 | e | 0.72 | 0.5 to 1.0 | Span efficiency |
+| M_crit | 0.65 | 0.5 to 0.95 | Critical Mach number for compressibility drag |
 | fe | 0.4085 | 0 to 0.95 | Empty weight fraction of gross weight. Set by typing an empty weight. |
 | ws | 6 lb/ft² | 0 to 30 | Empty weight added per square foot of wing |
 
@@ -47,8 +48,10 @@ Log sliders move by ratio and round to 4 significant figures. Linear sliders rou
 | TSFC c_t (jet) | 0.60 lb/lbf/h | 0.3 to 1.5 | 0.01 | |
 | Maximum fuel | 2,262 lb | 10 to 400,000 | log | EASA type certificate |
 | Maximum payload | 4,600 lb | 10 to 300,000 | log | Cabin limit. Crew counts as payload. |
+| Maximum landing weight | 12,500 lb | 500 to 1,300,000 | log | Caps payload |
 | Reserve | 45 min | 0 to 120 | 5 | At cruise fuel flow |
-| Takeoff and climb fuel | 2.0% | 0 to 8% | 0.1% | Of takeoff weight, no range credit |
+| Taxi and takeoff fuel | 0.8% | 0 to 3% | 0.01% | Of takeoff weight, burned before the climb |
+| Average climb rate | 1,150 ft/min | 0 to 6,000 | 10 | 0 leaves the climb out |
 
 ## Equations
 
@@ -85,11 +88,14 @@ Weight:
 - Empty weight We = fe·W + ws·S
 - Useful load U = W − We (payload plus fuel). REVA and REVB called this "payload", which was wrong once fuel is modelled.
 
-Altitude, fuel flow and range: see `docs/payload-range-spec.md`. In short:
-- σ from ISA, V_true = V ÷ √σ
+Altitude, fuel flow and range: see `docs/payload-range-spec.md` (version 2). In short:
+- Atmosphere: σ and θ from ISA. V_true = V ÷ √σ. Mach = V_true ÷ (661.48·√θ).
+- Compressibility: ΔCD = 20·(M − M_crit)⁴ above M_crit (Lock's law). Cruise drag D = Dp + Dc + Di, and L/D at cruise uses this D.
 - At the cruise EAS, D(w) = k₀ + k₂w². Fuel flow is c_p·D·V_true·KT ÷ (550η) for a prop, or c_t·D for a jet.
-- Range uses the exact constant-altitude, constant-speed integral, with a takeoff and climb allowance and a timed reserve.
+- Mission: taxi and takeoff, a climb at the cruise EAS (power or thrust for drag plus climbing), a cruise using the exact constant-altitude, constant-speed integral, an idle glide descent at 10% of cruise fuel flow, and a timed reserve. Range = climb + cruise + descent distance.
+- Payload is capped by maximum payload and by maximum landing weight (landing with the reserve).
 - The corner points are: A, maximum payload at zero range; B, maximum payload with fuel up to maximum takeoff weight; C, full tanks; D, full tanks with no payload.
+- Best-range speed: the EAS of least drag (prop) or most true airspeed per unit drag (jet), including compressibility, at W·(1 − taxi).
 
 ## Values at the Skyvan defaults
 
@@ -104,8 +110,11 @@ Altitude, fuel flow and range: see `docs/payload-range-spec.md`. In short:
 | Best L/D | 12.6 |
 | Gust load factor | 2.44 g |
 | Density ratio, true airspeed | 0.7385, 147.8 kt |
-| Cruise fuel flow | 375 lb/h |
-| Range: max payload, full tanks, ferry | 10, 715, 835 nmi |
+| Mach number | 0.232 |
+| Cruise fuel flow | 378 lb/h |
+| Climb with full tanks | 8.7 min, 98 lb, 20 nmi |
+| Range: max payload, full tanks, ferry | 66, 770, 882 nmi |
+| Best-range speed | 99 kt EAS (ferry 1,228 nmi if flown there) |
 
 ## Page layout
 
@@ -113,10 +122,10 @@ Altitude, fuel flow and range: see `docs/payload-range-spec.md`. In short:
 2. **Radar chart (left):** eight axes on a log scale from 25% of the reference (centre) to 400% (rim). The dashed ring is the reference (the preset, or your own point after "Make this the reference"). The filled shape is the current point, and a dotted outline shows a pinned point.
    - Axes in order: cruise speed (EAS), gross weight, useful load, cruise drag, gust load factor, wing area, stall speed, range with full tanks. The first seven are draggable handles; range is a result only (a small dot).
    - Labels show the value and the % change from the reference. Green means better, red means worse; speed, weight and wing area stay neutral. "Off scale" marks values outside 25 to 400%.
-3. **Controls (right):** a slider and typed box for stall speed, wing area, gross weight, cruise speed, CLmax, aspect ratio and cruise altitude. Seven tiles: wing loading, span, empty weight, cruise L/D, best L/D, minimum drag speed and true airspeed. A collapsible "Aircraft constants" block holds CD0, span efficiency, empty weight and empty weight per ft² of wing.
+3. **Controls (right):** a slider and typed box for stall speed, wing area, gross weight, cruise speed, CLmax, aspect ratio and cruise altitude. Eight tiles: wing loading, span, empty weight, cruise L/D, best L/D, minimum drag speed, true airspeed and Mach number. A collapsible "Aircraft constants" block holds CD0, span efficiency, critical Mach, empty weight and empty weight per ft² of wing.
 4. **Payload and range:**
    - Left: a propeller/jet switch and the fuel inputs. BSFC and propeller efficiency show for props; TSFC shows for jets.
-   - Right: the payload-range diagram with the reference dashed and points B, C and D labelled, a warning line, and five tiles (range at max payload, payload with full tanks, range with full tanks, ferry range, cruise fuel flow).
+   - Right: the payload-range diagram with the reference dashed and points B, C and D labelled, a warning line, six tiles (range at max payload, payload with full tanks, range with full tanks, ferry range, cruise fuel flow, best-range speed), and a "Fly at best-range speed" button. The fuel inputs include maximum landing weight, taxi fuel and average climb rate.
    - The warning line covers no useful load, a maximum-payload mission with no usable cruise fuel, and cruise speed below stall.
 5. **Drag against speed:** parasite, induced and total drag against equivalent airspeed. Both axes rescale to the current aircraft with round-number ticks. Shows the stall line, minimum drag point, cruise point and the reference total drag dashed.
 6. **How the quantities connect:** the 16-box dependency map, unchanged except that "Payload" is now "Useful load".
@@ -180,12 +189,31 @@ The map doesn't yet show altitude, fuel or range.
 - Reset reloads the current preset.
 
 ### Tests and data files
-- `tests/ui.test.js`: 21 headless-browser checks. Add a reference page as a second argument to also run a bit-for-bit sizing regression.
+- `tests/ui.test.js`: 30 headless-browser checks. Add a reference page as a second argument to also run a bit-for-bit sizing regression.
 - `tests/independent/`: an implementation of the spec written separately, by a different agent that never saw the page code. It holds the test cases and its expected outputs, which the test suite compares with the page.
 - `tests/presets-report.js`: prints each preset's model outputs next to published figures.
 - `window.__app` exposes `st`, `setInput`, `loadPreset`, `ref` and `model` for the tests.
 
 ## Revision history
+
+### REVD (from REVC)
+
+Added:
+- Mach number and compressibility drag, with a per-aircraft critical Mach number. The drag chart draws compressibility drag when it is present, and a warning appears past drag divergence.
+- A climb segment from an average climb rate, and an idle glide descent. Both use fuel and cover distance.
+- Taxi and takeoff fuel. It replaces REVC's flat "takeoff and climb" allowance.
+- Maximum landing weight. It caps payload, and a warning appears when it binds.
+- Best-range speed: a tile, a diamond on the drag chart, and a "Fly at best-range speed" button.
+- A Mach tile, plus math rows for Mach, compressibility, the payload limit, climb, descent and best-range speed.
+- Preset values for landing weight, climb rate, taxi fuel and critical Mach, with the sources in `docs/presets.md`.
+
+Verified:
+- The page matches a separate implementation of spec version 2 on 12 cases (828 values).
+- Best-range speed reduces to the textbook results (Vmd for props, 3^¼·Vmd for jets) to 0.003 kt when compressibility is off.
+- For 400 random aircraft, fuel and distance add up exactly at every corner point, and no corner lands above maximum landing weight.
+- The sizing model is still bit-identical to REVB.
+- The Cessna climb gives 14.0 min and 19 lb, against the handbook's 14 min and 18 lb.
+- Random edits found a runaway reserve iteration at Mach > 1, which put NaN on screen. The iteration now stops, and the mission is shown as unflyable.
 
 ### REVC (from REVB)
 
@@ -229,11 +257,20 @@ REVB also removed a hidden, unreachable "stall mode" and some dead code.
 
 ## Known limits and ideas
 
-- No compressibility: jet results above about Mach 0.6 are rough.
-- No climb or descent distance; range is flown at one altitude and one equivalent airspeed. There's no step climb and no speed optimisation (for example long-range cruise).
+- Compressibility follows Lock's law with no lift-coefficient dependence, so it is rough past drag divergence.
+- The climb is flown at the cruise EAS and at constant weight, with no check against installed power or thrust. Descent is an idle glide with no drag devices. There's no step climb, and no wind.
+- Best-range speed is the true optimum. "Long-range cruise" (99% of best specific range, at a higher speed) isn't modelled.
 - CD0 has no Reynolds number or wetted-area dependence. Propeller efficiency and fuel consumption don't vary with speed or altitude.
 - The empty-weight rule is a two-term fit through one point per aircraft, so it gives trends away from the start.
 - The gust model is FAR 23 style with sea-level density, and is not right for transport aircraft.
 - No check stops impossible points, for example cruise below stall (the page warns) or negative useful load.
 - The powered stall is lumped into CLmax. A power-on versus power-off toggle is a future option.
-- Ideas: show altitude, fuel and range on the dependency map; long-range cruise speed; maximum landing weight; export and import of a custom aircraft; a clean versus flapped CLmax pair.
+- Ideas:
+  - show altitude, fuel and range on the dependency map;
+  - a mission point (payload and distance) with pass or fail;
+  - share a design by URL, or export and import it;
+  - calibrate a preset against one published point;
+  - an engine power or thrust check;
+  - takeoff and landing distance;
+  - a constraint diagram;
+  - a clean versus flapped CLmax pair.

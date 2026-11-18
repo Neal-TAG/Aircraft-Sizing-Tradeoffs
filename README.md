@@ -1,4 +1,4 @@
-# Aircraft Sizing Trade-offs
+﻿# Aircraft Sizing Trade-offs
 
 An interactive page that shows how the main aircraft sizing quantities affect each other: gross weight, wing area, cruise speed, maximum lift coefficient, aspect ratio, stall speed, altitude, fuel and payload. Change one value and watch the physics move the rest, down to a rough payload-range diagram. Ranges cover a light single up to a narrow-body jet. It starts at the stock Short SC.7 Skyvan Series 3 (powered), with presets for the Cessna 172S, King Air 350, ATR 72-600 and Boeing 737-800.
 
@@ -23,7 +23,7 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 | File | What it is |
 |---|---|
-| `index.html` | The page (REVC) |
+| `index.html` | The page (REVD) |
 | `BRIEF.md` | Full spec: equations, inputs and ranges, layout, behaviour, and revision history |
 | `docs/payload-range-spec.md` | Altitude, fuel-flow and payload-range math |
 | `docs/presets.md` | Preset values, sources, estimates, and model-versus-published comparison |
@@ -49,4 +49,4 @@ node tests/ui.test.js index.html old.html
 
 ## Limits
 
-No compressibility, no climb or descent distance, and an empty-weight rule fitted through one point per aircraft, so results are trends, not predictions. See `BRIEF.md` for the full list.
+Rough compressibility, a simple climb and descent, no winds, and an empty-weight rule fitted through one point per aircraft, so results are trends, not predictions. See `BRIEF.md` for the full list.
