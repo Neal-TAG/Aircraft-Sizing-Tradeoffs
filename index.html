@@ -111,6 +111,13 @@ td.num,th.num{text-align:right;white-space:nowrap}
 #curve .vs{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
 #curve .cr{fill:var(--panel);stroke:var(--accent);stroke-width:3} #curve .md{fill:var(--accent)}
 .legend i.c1{border-top-color:var(--warn)} .legend i.c2{border-top-color:var(--pin)}
+.phase{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:inherit;font-weight:500;border:0;background:transparent;color:var(--muted);padding:7px 14px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.phase .pn{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
 </style>
 </head>
 <body>
@@ -121,6 +128,10 @@ td.num,th.num{text-align:right;white-space:nowrap}
     <p class="sub">Starts at the stock Skyvan Series 3, powered. Move one quantity and see how the physics moves the others. The dashed ring is the stock Skyvan.</p>
   </div>
   <div class="bar">
+    <div class="phase">
+      <div class="seg" role="group" aria-label="Flight phase"><button type="button" id="phFlaps" aria-pressed="true">Flaps down</button><button type="button" id="phClean" aria-pressed="false">Clean</button></div>
+      <span class="pn" id="phaseNote"></span>
+    </div>
     <button type="button" class="btn" id="btnPin">Pin this point</button>
     <button type="button" class="btn" id="btnReset">Reset</button>
   </div>
@@ -169,7 +180,7 @@ td.num,th.num{text-align:right;white-space:nowrap}
 <script id="model">
 var KT=1.688, RHO=0.002377, G0=32.2;
 var C={CD0:0.040,e:0.72,fe:0.4085,ws:6,ude:50};
-var REF={W:12500,V:127,S:373,CLmax:2.75,AR:11.3};
+var REF={W:12500,V:127,S:373,CLmax:2.75,CLc:1.5,AR:11.3};
 function cla(A){return 2*Math.PI*A/(2+Math.sqrt(4+A*A/0.9025));}
 function sizeWing(W,Vs,CLmax){return 2*W/(RHO*Math.pow(Vs*KT,2)*CLmax);}
 function drag(W,V,S,AR){var q=0.5*RHO*Math.pow(V*KT,2),Dp=q*S*C.CD0,Di=W*W/(q*Math.PI*AR*S*C.e);return {q:q,Dp:Dp,Di:Di,D:Dp+Di};}
@@ -180,7 +191,10 @@ function model(W,V,S,CLmax,AR){
   var We=C.fe*W+C.ws*S;
   return {S:S,b:b,c:c,CLa:a,WS:WS,Vs:Vs,q:d.q,mu:mu,Kg:Kg,n:n,Dp:d.Dp,Di:d.Di,D:d.D,LD:W/d.D,LDmax:LDmax,Vmd:Vmd,We:We,payload:W-We};
 }
-function evaluate(st){return model(st.W,st.V,st.S,st.CLmax,st.AR);}
+/* Flight phase picks which maximum lift coefficient sets the stall: flaps down (st.CLmax) or clean (st.CLc). */
+function activeCL(st,phase){return phase==="clean"?st.CLc:st.CLmax;}
+function evaluate(st,phase){return model(st.W,st.V,st.S,activeCL(st,phase===undefined?evaluate.phase:phase),st.AR);}
+evaluate.phase="flaps";
 if(typeof module!=="undefined") module.exports={model:model,sizeWing:sizeWing,evaluate:evaluate,REF:REF};
 </script>
 
@@ -193,10 +207,13 @@ function fmt(x,d){return x.toLocaleString("en-US",{minimumFractionDigits:d||0,ma
 function sgn(x,d){return (x>=0?"+":"−")+Math.abs(x).toFixed(d);}
 function pct(x){return sgn(x,Math.abs(x)<9.95?1:0)+"%";}
 
-var RANGE={W:[5000,16000,10],V:[80,240,1],Vs:[40,90,0.5],S:[200,700,1],CLmax:[1.2,3.0,0.05],AR:[6,16,0.5]};
-var base0=model(REF.W,REF.V,REF.S,REF.CLmax,REF.AR);
+var RANGE={W:[5000,16000,10],V:[80,240,1],Vs:[40,90,0.5],S:[200,700,1],CLmax:[1.2,3.0,0.05],CLc:[1.0,2.2,0.05],AR:[6,16,0.5]};
+var base0=model(REF.W,REF.V,REF.S,REF.CLmax,REF.AR),baseC=model(REF.W,REF.V,REF.S,REF.CLc,REF.AR);
+var phase="flaps";
+function clKey(){return phase==="clean"?"CLc":"CLmax";}
+function baseP(){return phase==="clean"?baseC:base0;}
 var st,pinned=null,touched="W",selNode=null;
-function reset(){st={W:REF.W,V:REF.V,S:REF.S,CLmax:REF.CLmax,AR:REF.AR}; pinned=null; touched="W"; selNode=null; render();}
+function reset(){st={W:REF.W,V:REF.V,S:REF.S,CLmax:REF.CLmax,CLc:REF.CLc,AR:REF.AR}; pinned=null; touched="W"; selNode=null; render();}
 
 var AX=[
  {id:"V",name:"Cruise speed",unit:"kt",d:0,get:function(r){return st.V;},b:REF.V,sense:0},
@@ -219,12 +236,12 @@ function buildRadar(){var s=$("#radar"); s.textContent=""; var i;
   for(i=0;i<NA;i++){var o=pt(i,PMAX); s.appendChild(el("line",{x1:CX,y1:CY,x2:o[0],y2:o[1],"class":"spoke"}));}
   rEls.pin=el("polygon",{"class":"pinshape",points:""}); s.appendChild(rEls.pin);
   rEls.shape=el("polygon",{"class":"shape",points:""}); s.appendChild(rEls.shape);
-  rEls.dots=[];rEls.lab=[];
+  rEls.dots=[];rEls.lab=[];rEls.names=[];
   AX.forEach(function(a,i){var an=ang(i),lx=CX+(RR+16)*Math.cos(an),ly=CY+(RR+16)*Math.sin(an),c=Math.cos(an);
     var anchor=Math.abs(c)<0.2?"middle":(c>0?"start":"end"); var dy=Math.sin(an)<-0.5?-34:(Math.sin(an)>0.5?14:-12);
     var t1=el("text",{x:lx,y:ly+dy,"text-anchor":anchor,"class":"ax-name"},a.name);
     var t2=el("text",{x:lx,y:ly+dy+16,"text-anchor":anchor,"class":"ax-val"}); var t3=el("text",{x:lx,y:ly+dy+31,"text-anchor":anchor,"class":"ax-d"});
-    s.appendChild(t1);s.appendChild(t2);s.appendChild(t3); rEls.lab.push([t2,t3]);});
+    s.appendChild(t1);s.appendChild(t2);s.appendChild(t3); rEls.lab.push([t2,t3]); rEls.names.push(t1);});
   AX.forEach(function(a,i){var c=el("circle",{r:9,"class":"handle","data-i":i,tabindex:"0",role:"slider","aria-label":a.name});
     s.appendChild(c); rEls.dots.push(c);});
 }
@@ -238,19 +255,28 @@ function renderRadar(r){var pts=[];
     dot.setAttribute("aria-valuenow",p.toFixed(1)); dot.setAttribute("aria-valuemin",PMIN); dot.setAttribute("aria-valuemax",PMAX);
     dot.setAttribute("aria-valuetext",vt+", "+t.textContent+" from stock");});
   rEls.shape.setAttribute("points",pts.join(" "));
-  if(pinned){var pp=[];AX.forEach(function(a,i){pp.push(pt(i,100*pinned[a.id]/a.b).join(","));});rEls.pin.setAttribute("points",pp.join(" "));}
+  if(pinned){var pp=[];AX.forEach(function(a,i){var pv=a.id==="Vs"?(phase==="clean"?pinned.VsC:pinned.VsF):pinned[a.id]; pp.push(pt(i,100*pv/a.b).join(","));});rEls.pin.setAttribute("points",pp.join(" "));}
   else rEls.pin.setAttribute("points","");
 }
 function clampSet(id,v){var R=RANGE[id]; v=Math.round(v/R[2])*R[2]; v=Math.min(R[1],Math.max(R[0],v)); st[id]=+v.toFixed(4);}
 var MOVES={Vs:"S",payload:"W",D:"V",n:"V"};
 function setInput(id,v){
-  if(id==="Vs"){clampSet("S",sizeWing(st.W,v,st.CLmax));}
+  if(id==="Vs"){clampSet("S",sizeWing(st.W,v,activeCL(st,phase)));}
+  else if(id==="CLmax"){clampSet(clKey(),v);}
   else if(id==="payload"){clampSet("W",(v+C.ws*st.S)/(1-C.fe));}
   else if(id==="n"){var r0=model(st.W,st.V,st.S,st.CLmax,st.AR),k=(r0.n-1)/st.V;clampSet("V",(v-1)/k);}
   else if(id==="D"){var r1=model(st.W,RANGE.V[0],st.S,st.CLmax,st.AR),lo=Math.max(RANGE.V[0],r1.Vmd),hi=RANGE.V[1],dd=function(x){return drag(st.W,x,st.S,st.AR).D;};
     if(v<=dd(lo)) clampSet("V",lo); else if(v>=dd(hi)) clampSet("V",hi); else {for(var i=0;i<60;i++){var mid=(lo+hi)/2; if(dd(mid)<v) lo=mid; else hi=mid;} clampSet("V",(lo+hi)/2);} }
   else clampSet(id,v);
   touched=MOVES[id]||id; render();}
+function setPhase(p){if(p!=="clean")p="flaps"; phase=p; evaluate.phase=p; var cl=p==="clean";
+  AX[6].b=baseP().Vs; rEls.names[6].textContent=cl?"Clean stall":"Stall speed"; rEls.dots[6].setAttribute("aria-label",cl?"Clean stall speed":"Stall speed");
+  $("#phFlaps").setAttribute("aria-pressed",String(!cl)); $("#phClean").setAttribute("aria-pressed",String(cl));
+  var R=RANGE[clKey()]; sEls.CLmax.inp.min=R[0]; sEls.CLmax.inp.max=R[1]; sEls.CLmax.num.min=R[0]; sEls.CLmax.num.max=R[1];
+  sEls.CLmax.h.textContent=cl?"Clean, flaps up. 1.5 is an estimate; enter your own. Changes the stall speed.":"Powered, flaps down. Changes the stall speed.";
+  sEls.Vs.l.textContent=cl?"Clean stall speed":"Stall speed"; sEls.CLmax.l.textContent=cl?"Maximum lift coefficient, clean":"Maximum lift coefficient";
+  mEls.n.Vs.lab.textContent=cl?"Clean stall":"Stall speed"; mEls.n.CLmax.lab.textContent=cl?"Max lift, clean":"Max lift coefficient";
+  render();}
 /* Keyboard step: 1 percentage point of the stock value, the same unit as the radar's rings.
    (A step of 1% of the current value runs backwards when the value is negative and vanishes near zero.)
    If rounding to the slider step swallows the move, take bigger steps until something changes. */
@@ -267,7 +293,7 @@ function stepHandle(a,dir){var cur=a.get(evaluate(st)),before=JSON.stringify(st)
 
 var SL={Vs:["Stall speed","kt",1],S:["Wing area","ft²",0],W:["Gross weight","lb",0],V:["Cruise speed","kt",0],CLmax:["Maximum lift coefficient","",2],AR:["Aspect ratio","",1]};
 var ORDER=["Vs","S","W","V","CLmax","AR"],sEls={};
-function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:st[id];}
+function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:id==="CLmax"?st[clKey()]:st[id];}
 function buildSliders(){var box=$("#sliders"); box.textContent=""; sEls={};
   ORDER.forEach(function(id){var d=document.createElement("div"); d.className="row";
     var l=document.createElement("label"); l.htmlFor="s_"+id; l.textContent=SL[id][0];
@@ -279,7 +305,7 @@ function buildSliders(){var box=$("#sliders"); box.textContent=""; sEls={};
     num.addEventListener("keydown",function(ev){if(ev.key==="Enter"){num.blur();} else if(ev.key==="Escape"){num.value=(+curVal(id,evaluate(st))).toFixed(SL[id][2]); num.blur();}});
     var inp=document.createElement("input"); inp.type="range"; inp.id="s_"+id; inp.min=RANGE[id][0]; inp.max=RANGE[id][1]; inp.step=RANGE[id][2];
     inp.addEventListener("input",function(){setInput(id,+inp.value);}); d.appendChild(inp);
-    var h=document.createElement("span"); h.className="hint"; d.appendChild(h); box.appendChild(d); sEls[id]={v:v,num:num,inp:inp,h:h};});
+    var h=document.createElement("span"); h.className="hint"; d.appendChild(h); box.appendChild(d); sEls[id]={v:v,num:num,inp:inp,h:h,l:l};});
   sEls.AR.h.textContent="Span squared divided by wing area. Slender wings have a high value.";
   sEls.CLmax.h.textContent="Powered, flaps down. Changes the stall speed.";
   sEls.Vs.h.textContent="Changing this resizes the wing to give that stall speed.";
@@ -301,12 +327,12 @@ function renderCurve(r){var s=$("#curve"); s.textContent=""; var v,d;
   for(d=0;d<=CV.dmax;d+=600){s.appendChild(el("line",{x1:CV.x0,x2:CV.x1,y1:cy(d),y2:cy(d),"class":"gl"}));s.appendChild(el("text",{x:CV.x0-8,y:cy(d)+4,"text-anchor":"end","class":"tk"},fmt(d)));}
   for(v=40;v<=260;v+=20){s.appendChild(el("text",{x:cx(v),y:CV.y0+16,"text-anchor":"middle","class":"tk"},v));}
   s.appendChild(el("text",{x:CV.x1,y:CV.y0+32,"text-anchor":"end","class":"tk"},"Speed, kt")); s.appendChild(el("text",{x:CV.x0,y:10,"class":"tk"},"Drag, lb"));
-  s.appendChild(el("path",{d:curvePath(REF.W,REF.S,REF.AR,base0.Vs,"D"),"class":"cb"}));
+  s.appendChild(el("path",{d:curvePath(REF.W,REF.S,REF.AR,baseP().Vs,"D"),"class":"cb"}));
   s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"Dp"),"class":"c1"}));
   s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"Di"),"class":"c2"}));
   s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"D"),"class":"ct"}));
   var xs=cx(Math.max(CV.vmin,r.Vs)); s.appendChild(el("line",{x1:xs,x2:xs,y1:CV.y1,y2:CV.y0,"class":"vs"}));
-  s.appendChild(el("text",{x:xs+6,y:CV.y1+12,"class":"lb"},"Stall "+r.Vs.toFixed(1)+" kt"));
+  s.appendChild(el("text",{x:xs+6,y:CV.y1+12,"class":"lb"},(phase==="clean"?"Clean stall ":"Stall ")+r.Vs.toFixed(1)+" kt"));
   var xm=cx(r.Vmd),ym=cy(drag(st.W,r.Vmd,r.S,st.AR).D); if(r.Vmd>r.Vs){s.appendChild(el("circle",{cx:xm,cy:ym,r:4,"class":"md"})); s.appendChild(el("text",{x:xm,y:ym-10,"text-anchor":"middle","class":"lb"},"Minimum drag"));}
   var xc=cx(st.V),yc=cy(r.D); s.appendChild(el("circle",{cx:xc,cy:yc,r:7,"class":"cr"}));
   s.appendChild(el("text",{x:xc,y:yc-12,"text-anchor":"middle","class":"lb b"},"Cruise "+fmt(r.D)+" lb"));
@@ -319,7 +345,7 @@ function buildMap(){var X=function(c){return 8+c*150;};
    {id:"Vs",label:"Stall speed",x:X(1),y:60,v:function(r){return r.Vs.toFixed(1)+" kt";}},
    {id:"S",label:"Wing area",x:X(0),y:16,inp:true,v:function(r){return fmt(r.S)+" ft²";}},
    {id:"W",label:"Gross weight",x:X(0),y:90,inp:true,v:function(r){return fmt(st.W)+" lb";}},
-   {id:"CLmax",label:"Max lift coefficient",x:X(0),y:164,inp:true,v:function(r){return st.CLmax.toFixed(2);}},
+   {id:"CLmax",label:"Max lift coefficient",x:X(0),y:164,inp:true,v:function(r){return activeCL(st,phase).toFixed(2);}},
    {id:"AR",label:"Aspect ratio",x:X(0),y:238,inp:true,v:function(r){return st.AR.toFixed(1);}},
    {id:"V",label:"Cruise speed",x:X(0),y:312,inp:true,v:function(r){return fmt(st.V)+" kt";}},
    {id:"q",label:"Dynamic pressure",x:X(1),y:312,v:function(r){return r.q.toFixed(1)+" lb/ft²";}},
@@ -340,8 +366,8 @@ function buildMap(){var X=function(c){return 8+c*150;};
   NODES.forEach(function(n){var g=el("g",{"class":"node"+(n.inp?" in":""),tabindex:"0",role:"button","aria-label":n.label});
     g.addEventListener("click",function(ev){ev.stopPropagation(); selNode=(selNode===n.id)?null:n.id; renderMap(window.__last);});
     g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault(); selNode=(selNode===n.id)?null:n.id; renderMap(window.__last);}});
-    g.appendChild(el("rect",{x:n.x,y:n.y,width:128,height:46,rx:7})); g.appendChild(el("text",{x:n.x+9,y:n.y+17},n.label));
-    var t=el("text",{x:n.x+9,y:n.y+36,"class":"nv"}); g.appendChild(t); s.appendChild(g); mEls.n[n.id]={g:g,t:t,n:n};});
+    g.appendChild(el("rect",{x:n.x,y:n.y,width:128,height:46,rx:7})); var lab=el("text",{x:n.x+9,y:n.y+17},n.label); g.appendChild(lab);
+    var t=el("text",{x:n.x+9,y:n.y+36,"class":"nv"}); g.appendChild(t); s.appendChild(g); mEls.n[n.id]={g:g,t:t,n:n,lab:lab};});
 }
 function reach(start,fwd){var seen={},ch=true; seen[start]=1;
   while(ch){ch=false;EDGES.forEach(function(e){var a=fwd?e[0]:e[1],b=fwd?e[1]:e[0]; if(seen[a]&&!seen[b]){seen[b]=1;ch=true;}});}
@@ -370,7 +396,7 @@ function renderMap(r){var id,m;
 function renderSens(r){var ins=["S","W","V","CLmax","AR"];
   var outs=[["Vs","Stall speed",-1],["payload","Payload",1],["Dp","Parasite drag",-1],["Di","Induced drag",-1],["D","Cruise drag",-1],["n","Gust factor",-1]];
   $("#sens thead").innerHTML="<tr><th>1% more</th>"+outs.map(function(o){return '<th class="num">'+o[1]+"</th>";}).join("")+"</tr>";
-  $("#sens tbody").innerHTML=ins.map(function(id){var s2={};for(var k in st)s2[k]=st[k]; s2[id]=st[id]*1.001; var r2=evaluate(s2);
+  $("#sens tbody").innerHTML=ins.map(function(id){var s2={};for(var k in st)s2[k]=st[k]; var k2=id==="CLmax"?clKey():id; s2[k2]=st[k2]*1.001; var r2=evaluate(s2);
     return "<tr><td>"+SL[id][0]+"</td>"+outs.map(function(o){var a=r[o[0]],b=r2[o[0]];
       /* a log derivative only means something for a positive quantity; payload can go to zero or below */
       if(!(a>0&&b>0)) return '<td class="mut" title="Zero or negative, so a percent change has no meaning">–</td>';
@@ -379,7 +405,7 @@ function renderSens(r){var ins=["S","W","V","CLmax","AR"];
 }
 
 function renderMath(r){var W=st.W,V=st.V,f=fmt,rows=[];
-  rows.push(["Stall speed","√(2W ÷ (ρ × S × CLmax)) ÷ 1.688","√(2 × "+f(W)+" ÷ (0.002377 × "+f(r.S,1)+" × "+st.CLmax.toFixed(2)+")) ÷ 1.688",r.Vs.toFixed(1)+" kt"]);
+  rows.push([phase==="clean"?"Clean stall speed":"Stall speed","√(2W ÷ (ρ × S × CLmax)) ÷ 1.688","√(2 × "+f(W)+" ÷ (0.002377 × "+f(r.S,1)+" × "+activeCL(st,phase).toFixed(2)+")) ÷ 1.688",r.Vs.toFixed(1)+" kt"]);
   rows.push(["Span","√(aspect ratio × S)","√("+st.AR.toFixed(1)+" × "+f(r.S,1)+")",r.b.toFixed(1)+" ft"]);
   rows.push(["Wing loading","W ÷ S",f(W)+" ÷ "+f(r.S,1),r.WS.toFixed(1)+" lb/ft²"]);
   rows.push(["Dynamic pressure","½ × ρ × (V × 1.688)²","0.5 × 0.002377 × ("+f(V)+" × 1.688)²",r.q.toFixed(1)+" lb/ft²"]);
@@ -399,13 +425,17 @@ function renderNotes(){
    "<p><b>The core link.</b> Stall speed, weight, wing area and maximum lift coefficient are tied by one equation. Set three and the fourth follows. Stall speed goes with the square root of wing loading.</p>"+
    "<p><b>Drag.</b> Parasite drag goes with speed squared and wing area. Induced drag goes with weight squared and falls with speed squared and span squared. Their sum is lowest where the two are equal.</p>"+
    "<p><b>Gusts.</b> The gust load factor rises with speed and falls with wing loading. A large wing that gives a slow stall also gives a rough ride at high speed.</p>"+
-   "<p><b>Starting point: stock Skyvan Series 3, powered.</b> 12,500 lb maximum takeoff weight. Wing 373 ft², aspect ratio 11.3. Maximum lift coefficient 2.75 with landing flap and power, which gives the published 60 kt stall. Cruise 127 kt, the sea-level equivalent of 148 kt true at 10,000 ft. Empty weight 7,344 lb at the start (Jane's basic empty weight).</p><p><b>Assumptions.</b> Sea level. Zero-lift drag coefficient 0.040 from the earlier Skyvan drag build-up (struts, fixed gear, upswept tail; nacelles and propellers not included, so drag reads a little low). Span efficiency 0.72 (Raymer). Gust velocity 50 ft/s. Empty weight is 40.85% of gross weight plus 6 lb for each square foot of wing, set so it matches 7,344 lb at the start. Stall speed uses the powered maximum lift coefficient; slipstream and thrust effects are inside that one number.</p>";
+   "<p><b>Starting point: stock Skyvan Series 3, powered.</b> 12,500 lb maximum takeoff weight. Wing 373 ft², aspect ratio 11.3. Maximum lift coefficient 2.75 with landing flap and power, which gives the published 60 kt stall. Cruise 127 kt, the sea-level equivalent of 148 kt true at 10,000 ft. Empty weight 7,344 lb at the start (Jane's basic empty weight).</p><p><b>Assumptions.</b> Sea level. Zero-lift drag coefficient 0.040 from the earlier Skyvan drag build-up (struts, fixed gear, upswept tail; nacelles and propellers not included, so drag reads a little low). Span efficiency 0.72 (Raymer). Gust velocity 50 ft/s. Empty weight is 40.85% of gross weight plus 6 lb for each square foot of wing, set so it matches 7,344 lb at the start. Stall speed uses the powered maximum lift coefficient; slipstream and thrust effects are inside that one number.</p><p><b>Flight phase.</b> Flaps down uses the landing-flap, powered lift coefficient (2.75). Clean uses a separate flaps-up value, 1.5 at the start, which is an estimate for a clean wing; set your own. The switch changes only which lift coefficient sets the stall speed. Drag, gusts and weights do not change, and the stall speed handle resizes the wing for the selected phase.</p>";
 }
-function render(){var r=evaluate(st); window.__last=r; renderRadar(r);renderSliders(r);renderTiles(r);renderCurve(r);renderMap(r);renderSens(r);renderMath(r);}
+function stallAt(cl){return Math.sqrt(2*st.W/(RHO*window.__last.S*cl))/KT;}
+function renderPhase(){$("#phaseNote").textContent="Stall "+stallAt(st.CLmax).toFixed(1)+" kt flaps down, "+stallAt(st.CLc).toFixed(1)+" kt clean";}
+function render(){var r=evaluate(st); window.__last=r; renderPhase(); renderRadar(r);renderSliders(r);renderTiles(r);renderCurve(r);renderMap(r);renderSens(r);renderMath(r);}
 $("#btnReset").addEventListener("click",reset);
-$("#btnPin").addEventListener("click",function(){var r=evaluate(st);pinned={V:st.V,W:st.W,payload:r.payload,D:r.D,n:r.n,S:r.S,Vs:r.Vs};render();});
+$("#btnPin").addEventListener("click",function(){var r=evaluate(st);pinned={V:st.V,W:st.W,payload:r.payload,D:r.D,n:r.n,S:r.S,Vs:r.Vs,VsF:stallAt(st.CLmax),VsC:stallAt(st.CLc)};render();});
+$("#phFlaps").addEventListener("click",function(){setPhase("flaps");});
+$("#phClean").addEventListener("click",function(){setPhase("clean");});
 document.getElementById('map').addEventListener('click',function(){if(selNode){selNode=null;renderMap(window.__last);}});
-window.__app={get st(){return st;},setInput:setInput};
+window.__app={get st(){return st;},get phase(){return phase;},setInput:setInput,setPhase:setPhase};
 buildRadar();buildSliders();buildMap();renderNotes();
 reset();
 })();

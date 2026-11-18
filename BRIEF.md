@@ -30,6 +30,7 @@ An interactive web page that shows how the main aircraft sizing quantities affec
 | Wing area S | 373 ft² | 200 to 700 | 1 | Published (Jane's 1977-78) |
 | Cruise speed V | 127 kt | 80 to 240 | 1 | 148 kt true at 10,000 ft (USFS 1972), as sea-level equivalent |
 | Maximum lift coefficient CLmax | 2.75 | 1.2 to 3.0 | 0.05 | Landing flap, powered. Derived from the published 60 kt stall at 12,500 lb (Jane's 1977-78) |
+| Clean maximum lift coefficient CLc | 1.5 (est) | 1.0 to 2.2 | 0.05 | Flaps up. Engineering estimate for a clean wing; used only when the flight phase is Clean |
 | Aspect ratio AR | 11.3 | 6 to 16 | 0.5 | 64.9 ft span² ÷ 373 ft² |
 | Stall speed Vs | result, 60.0 kt | 40 to 90 | 0.5 | Matches the published 60 kt at 12,500 lb |
 
@@ -50,6 +51,7 @@ Stall:
 - Vs = √(2W ÷ (ρ·S·CLmax)) ÷ KT (knots)
 - Inverse, used when stall speed is set: S = 2W ÷ (ρ·(Vs·KT)²·CLmax)
 - The powered stall is carried entirely by CLmax. Slipstream and thrust are not modelled separately.
+- **Flight phase** (header switch, Flaps down or Clean, default Flaps down): picks which lift coefficient sets the stall speed, CLmax or CLc. Nothing else changes: drag, gusts and weights are the same in both phases. In Clean, the stall speed handle and slider size the wing for the clean stall, the lift coefficient control edits CLc, the radar's stall axis is measured against the stock clean stall (81.2 kt), and labels read "Clean stall". A line under the switch always shows both stall speeds. Flaps down renders exactly what the page did before the switch was added.
 
 Gust load factor (FAR 23 style):
 - μ = 2(W/S) ÷ (ρ·c·CLa·g)
@@ -236,6 +238,10 @@ Five paragraphs, laid out in columns of at least 280 px:
 - **Assumptions:** CD0 0.040 comes from the earlier Skyvan drag build-up (struts, fixed gear and the upswept tail; nacelles and propellers left out, so drag reads a little low).
 
 - `window.__app` exposes `st` and `setInput` for the headless tests.
+
+## Flight phase switch (added after REVB)
+
+Added at a co-worker's request: a flapped (dirty) stall and a clean stall from the same wing. Lift only; no flap or gear drag. `tests/ui.test.js` checks it (`flightPhase`), and the regression pass against the previous page shows no differences in Flaps down.
 
 ## Changes in REVB (from REVA)
 

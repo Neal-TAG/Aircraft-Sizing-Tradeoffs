@@ -146,6 +146,36 @@ const tests = {
     }));
     return { pass: res.ok, detail: res.why };
   },
+  // Flight phase: Clean swaps in the clean lift coefficient for the stall and nothing else; Flaps down swaps back.
+  async flightPhase(page) {
+    const bad = [];
+    const note = () => page.textContent('#phaseNote');
+    const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) bad.push(`${what} ${a.toFixed(2)} (want ${b.toFixed(2)})`); };
+    const a = await state(page);
+    if (!(await note()).includes('60.0 kt flaps down, 81.2 kt clean')) bad.push('start note: ' + await note());
+    await page.click('#phClean');
+    const b = await state(page);
+    near(b.r.Vs, 60.0 * Math.sqrt(2.75 / 1.5), 0.05, 'clean stall');
+    for (const k of ['D', 'n', 'payload', 'S', 'WS']) near(b.r[k], a.r[k], 1e-9, k + ' changed with phase:');
+    if ((await page.inputValue('#n_CLmax')) !== '1.50') bad.push('lift box shows ' + await page.inputValue('#n_CLmax'));
+    const stallLab = await page.$$eval('#radar .ax-d', ts => ts[6].textContent);
+    if (stallLab !== 'start') bad.push('clean stall axis reads ' + stallLab);
+    await set(page, [['Vs', 75]]);
+    const c = await state(page);
+    near(c.r.Vs, 75, 0.3, 'clean stall after solve');
+    await set(page, [['CLmax', 1.8]]);
+    const d = await state(page);
+    if (d.st.CLc !== 1.8 || d.st.CLmax !== 2.75) bad.push(`lift control set CLc ${d.st.CLc}, CLmax ${d.st.CLmax}`);
+    await page.click('#phFlaps');
+    const e = await state(page);
+    near(e.r.Vs, Math.sqrt(2 * e.st.W / (0.002377 * e.r.S * 2.75)) / 1.688, 1e-6, 'flaps stall after switching back');
+    if ((await page.inputValue('#n_CLmax')) !== '2.75') bad.push('lift box after switching back shows ' + await page.inputValue('#n_CLmax'));
+    // the stall handle's arrows still go the right way in the clean phase
+    await page.click('#btnReset'); await page.click('#phClean');
+    const f = await state(page); await pressOnHandle(page, 6, 'ArrowUp'); const g = await state(page);
+    if (!(g.r.Vs > f.r.Vs)) bad.push(`clean stall ArrowUp ${f.r.Vs.toFixed(2)} -> ${g.r.Vs.toFixed(2)}`);
+    return { pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `clean stall ${b.r.Vs.toFixed(1)} kt, drag/gust/payload unchanged, solve and switch-back correct` };
+  },
   // Stock values from the brief.
   async stockValues(page) {
     const r = (await state(page)).r;

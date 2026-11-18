@@ -8,6 +8,7 @@ It is a teaching and early-trade tool, not a design tool.
 
 Open `index.html` in a browser. It is one self-contained file with no build step; the only outside request is Google Fonts.
 
+- **Flight phase:** switch between Flaps down (powered, landing-flap CLmax 2.75) and Clean (flaps-up CLmax, 1.5 estimated). It changes only the stall speed; both stalls show under the switch.
 - **Radar chart:** drag any of the seven handles, or focus one and use the arrow keys.
 - **Controls:** sliders and typed values. Enter applies, Esc cancels.
 - **Drag against speed:** parasite, induced and total drag, with the stall, minimum drag and cruise points marked.
