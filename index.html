@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* layout idea: instrument panel. radar left, controls right, then the map of dependencies, the worked math and the sensitivity grid */
+/* layout idea: instrument panel. radar left, controls right, then payload-range, drag, the map of dependencies, the sensitivity grid and the worked math */
 :root{
   --bg:#f3f5f4; --panel:#ffffff; --ink:#16211e; --muted:#5d6b67; --line:#d5dcd9; --grid:#e3e8e6;
   --accent:#0d8a63; --accent-soft:rgba(13,138,99,.18); --accent-fill:#d6ede4; --pin:#7a55c7; --pin-fill:#e9e2f7;
@@ -29,16 +29,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
 h1{font-family:var(--f-display);font-weight:600;font-size:30px;line-height:1.1;margin:0;text-wrap:balance}
 h2{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0 0 4px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:16px;margin:4px 0 0;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 p{margin:0}
 .sub{color:var(--muted);max-width:68ch}
 .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
-.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
-.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.seg button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer}
+select.btn{padding:7px 8px;max-width:100%}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:inherit;font-weight:500;border:0;background:transparent;color:var(--muted);padding:6px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
 .top{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
-@media (max-width:900px){.top{grid-template-columns:1fr}}
+.pr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:16px 24px;margin-top:8px}
+@media (max-width:900px){.top,.pr{grid-template-columns:1fr}}
 #radar{width:100%;height:auto;display:block;touch-action:none;user-select:none}
 #radar text{font-family:var(--f-body);fill:var(--ink)}
 #radar .ax-name{font-size:13px;font-weight:600}
@@ -52,19 +58,25 @@ header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-co
 #radar .pinshape{fill:none;stroke:var(--pin);stroke-width:1.6;stroke-dasharray:3 3}
 #radar .handle{fill:var(--panel);stroke:var(--accent);stroke-width:3;cursor:grab}
 #radar .handle:active{cursor:grabbing}
+#radar .dot{fill:var(--accent)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted);margin-top:4px}
 .legend i{display:inline-block;width:22px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
 .legend i.b{border-top:2px dashed var(--muted)} .legend i.p{border-top:2px dotted var(--pin)}
 .legend i.h{width:12px;height:12px;border:3px solid var(--accent);border-radius:50%;background:var(--panel)}
+.legend i.d{width:8px;height:8px;border:0;border-radius:50%;background:var(--accent)}
 .ctl{display:flex;flex-direction:column;gap:12px}
 .row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline}
 .row label{font-weight:500}
 .row .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;display:inline-flex;align-items:baseline;gap:6px}
 .row .v input{font:inherit;width:7.5em;text-align:right;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
 .row .v input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
-.row .v .u{color:var(--muted);font-size:13px;min-width:2.2em}
+.row .v .u{color:var(--muted);font-size:13px;min-width:2.6em}
 .row input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:2px 0 0}
 .row .hint{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.row[hidden]{display:none}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600}
+details .ctl{margin-top:12px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .tile .k{font-size:12px;color:var(--muted)} .tile .n{font-family:var(--f-mono);font-size:17px;font-variant-numeric:tabular-nums}
@@ -95,21 +107,24 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05
 td.num,th.num{text-align:right;white-space:nowrap}
 #math td:nth-child(2),#math td:nth-child(3){font-family:var(--f-mono);font-size:13px}
 #math td:nth-child(4){font-family:var(--f-mono);white-space:nowrap;font-weight:500}
+#math tr.grp td{font-family:var(--f-display);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:12px;padding-top:14px}
 #sens td{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
 #sens td:first-child{font-family:var(--f-body);text-align:left;font-weight:500}
 .good{color:var(--good)} .badc{color:var(--bad)} .mut{color:var(--muted)}
 .notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;font-size:14px;color:var(--muted)}
 .notes b{color:var(--ink);font-weight:600}
+.warnline{font-size:13px;color:var(--warn);min-height:1.2em}
 
-#curve{width:100%;height:auto;display:block}
-#curve .gl{stroke:var(--grid);stroke-width:1}
-#curve .tk{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
-#curve .lb{font-family:var(--f-body);font-size:12px;fill:var(--muted)} #curve .lb.b{fill:var(--ink);font-weight:600}
-#curve path{fill:none;stroke-width:2}
-#curve .ct{stroke:var(--accent);stroke-width:2.6} #curve .c1{stroke:var(--warn)} #curve .c2{stroke:var(--pin)}
-#curve .cb{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.4}
-#curve .vs{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
-#curve .cr{fill:var(--panel);stroke:var(--accent);stroke-width:3} #curve .md{fill:var(--accent)}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart .gl{stroke:var(--grid);stroke-width:1}
+svg.chart .tk{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+svg.chart .lb{font-family:var(--f-body);font-size:12px;fill:var(--muted)} svg.chart .lb.b{fill:var(--ink);font-weight:600}
+svg.chart path{fill:none;stroke-width:2}
+svg.chart .ct{stroke:var(--accent);stroke-width:2.6} svg.chart .c1{stroke:var(--warn)} svg.chart .c2{stroke:var(--pin)}
+svg.chart .cb{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.4}
+svg.chart .vs{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
+svg.chart .cr{fill:var(--panel);stroke:var(--accent);stroke-width:3} svg.chart .md{fill:var(--accent)}
+svg.chart .prfill{fill:var(--accent-soft);stroke:none}
 .legend i.c1{border-top-color:var(--warn)} .legend i.c2{border-top-color:var(--pin)}
 </style>
 </head>
@@ -118,9 +133,12 @@ td.num,th.num{text-align:right;white-space:nowrap}
 <header>
   <div>
     <h1>Aircraft sizing trade-offs</h1>
-    <p class="sub">Starts at the stock Skyvan Series 3, powered. Move one quantity and see how the physics moves the others. The dashed ring is the stock Skyvan.</p>
+    <p class="sub" id="subline"></p>
   </div>
   <div class="bar">
+    <label for="preset" class="sub">Aircraft</label>
+    <select id="preset" class="btn"></select>
+    <button type="button" class="btn" id="btnRef">Make this the reference</button>
     <button type="button" class="btn" id="btnPin">Pin this point</button>
     <button type="button" class="btn" id="btnReset">Reset</button>
   </div>
@@ -128,27 +146,49 @@ td.num,th.num{text-align:right;white-space:nowrap}
 
 <div class="top">
   <section class="panel">
-    <svg id="radar" viewBox="0 0 600 510" role="img" aria-label="Radar chart of seven quantities as a percentage of the starting point"></svg>
-    <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Stock Skyvan, 100%</span><span><i class="p"></i>Pinned point</span><span><i class="h"></i>Drag these</span></div>
+    <svg id="radar" viewBox="0 0 600 520" role="img" aria-label="Radar chart of eight quantities as a percentage of the reference aircraft, on a log scale from 25% to 400%"></svg>
+    <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Reference, 100%</span><span><i class="p"></i>Pinned point</span><span><i class="h"></i>Drag these</span><span><i class="d"></i>Result only</span></div>
   </section>
   <section class="panel ctl">
     <p id="modeNote" class="sub"></p>
     <div id="sliders" class="ctl"></div>
     <div class="tiles" id="tiles"></div>
+    <details id="constBox">
+      <summary>Aircraft constants</summary>
+      <p class="sub" style="margin-top:6px">Drag and empty-weight constants for this aircraft. Change them to model a different design. Use "Make this the reference" to compare against your own aircraft.</p>
+      <div id="constSliders" class="ctl"></div>
+    </details>
   </section>
 </div>
 
 <section class="panel">
+  <h2>Payload and range</h2>
+  <p class="sub">Range at constant altitude and constant equivalent airspeed, with fuel set aside for takeoff and climb and a timed reserve. The corners are: maximum payload; maximum payload with fuel up to maximum takeoff weight; full tanks with payload traded away; full tanks with no payload.</p>
+  <div class="pr">
+    <div class="ctl">
+      <div class="row"><span style="font-weight:500">Engines</span><span class="seg" role="group" aria-label="Propulsion type"><button type="button" id="bProp" aria-pressed="true">Propeller</button><button type="button" id="bJet" aria-pressed="false">Jet</button></span></div>
+      <div id="prSliders" class="ctl"></div>
+    </div>
+    <div>
+      <svg id="prchart" class="chart" viewBox="0 0 640 340" role="img" aria-label="Payload against range"></svg>
+      <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Reference</span></div>
+      <p class="warnline" id="prWarn" aria-live="polite"></p>
+      <div class="tiles" id="prTiles" style="margin-top:8px"></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
   <h2>Drag against speed</h2>
-  <p class="sub">Parasite drag rises with speed squared. Induced drag falls with speed squared. Weight lifts the induced curve; wing area lifts the parasite curve and moves the stall line.</p>
-  <svg id="curve" viewBox="0 0 900 330" role="img" aria-label="Drag against speed with stall speed and cruise speed marked"></svg>
-  <div class="legend"><span><i></i>Total drag</span><span><i class="c1"></i>Parasite</span><span><i class="c2"></i>Induced</span><span><i class="b"></i>Total, stock Skyvan</span></div>
+  <p class="sub">Parasite drag rises with speed squared. Induced drag falls with speed squared. Weight lifts the induced curve; wing area lifts the parasite curve and moves the stall line. Speeds are equivalent airspeed, so the curves don't move with altitude. Both axes scale to the current aircraft.</p>
+  <svg id="curve" class="chart" viewBox="0 0 900 330" role="img" aria-label="Drag against speed with stall speed and cruise speed marked"></svg>
+  <div class="legend"><span><i></i>Total drag</span><span><i class="c1"></i>Parasite</span><span><i class="c2"></i>Induced</span><span><i class="b"></i>Total, reference</span></div>
 </section>
 
 <section class="panel">
   <h2>How the quantities connect</h2>
   <p class="sub">Each box feeds the boxes its lines lead to. Click a box to see what affects it and what it affects; click it again to clear. Otherwise, everything downstream of the control you last touched is highlighted.</p>
-  <div class="scroll"><svg id="map" viewBox="0 0 900 372" role="img" aria-label="Dependency map from inputs to payload and drag"></svg></div>
+  <div class="scroll"><svg id="map" viewBox="0 0 900 372" role="img" aria-label="Dependency map from inputs to useful load and drag"></svg></div>
   <div class="mapkey" id="mapkey" aria-live="polite"></div>
 </section>
 
@@ -167,21 +207,59 @@ td.num,th.num{text-align:right;white-space:nowrap}
 </div>
 
 <script id="model">
-var KT=1.688, RHO=0.002377, G0=32.2;
-var C={CD0:0.040,e:0.72,fe:0.4085,ws:6,ude:50};
-var REF={W:12500,V:127,S:373,CLmax:2.75,AR:11.3};
+var KT=1.688, RHO=0.002377, G0=32.2, UDE=50;
+/* Presets. Every field is an input to model(). fe is set so the empty-weight rule We = fe·W + ws·S gives the listed empty weight. */
+/* Sources and estimates for each preset are listed in docs/presets.md. */
+var PRESETS={
+ skyvan:{name:"Short SC.7 Skyvan Series 3",W:12500,V:127,S:373,CLmax:2.75,AR:11.3,CD0:0.040,e:0.72,fe:0.4085,ws:6,h:10000,prop:"prop",cp:0.60,eta:0.80,ct:0.60,Fmax:2262,Pmax:4600,tr:45,fc:0.02,
+  note:"12,500 lb maximum takeoff weight. Wing 373 ft², aspect ratio 11.3. Maximum lift coefficient 2.75 with landing flap and power, which gives the published 60 kt stall. Cruise 127 kt equivalent, which is 148 kt true at 10,000 ft. Empty weight 7,344 lb (Jane's basic empty weight). 2,262 lb usable fuel and 4,600 lb maximum cabin payload (EASA type certificate). Fuel consumption 0.60 lb/shp/h is an estimate."},
+ c172:{name:"Cessna 172S Skyhawk",W:2550,V:108,S:174,CLmax:1.90,AR:7.5,CD0:0.032,e:0.75,fe:0.4816,ws:2.5,h:8000,prop:"prop",cp:0.46,eta:0.78,ct:0.60,Fmax:318,Pmax:895,tr:45,fc:0.01,
+  note:"2,550 lb maximum takeoff weight, 174 ft² wing, 36.1 ft span, 1,663 lb standard empty weight, 48 kt flaps-down stall, 122 kt true at 8,000 ft, 53 gal (318 lb) usable fuel and 895 lb maximum useful load, all from the pilot's operating handbook. Fuel consumption 0.46 lb/hp/h is backed out of the handbook's cruise table. Drag constants are estimates."},
+ kingair350:{name:"Beechcraft King Air 350",W:15000,V:174,S:300,CLmax:2.25,AR:11.2,CD0:0.027,e:0.80,fe:0.5837,ws:4,h:35000,prop:"prop",cp:0.58,eta:0.82,ct:0.60,Fmax:3611,Pmax:2545,tr:45,fc:0.025,
+  note:"15,000 lb maximum takeoff weight, 300 ft² wing and 57.9 ft span (EASA type certificate). 9,955 lb basic operating weight and 539 gal (3,611 lb) usable fuel (Textron). Maximum payload 2,545 lb assumes a 12,500 lb zero-fuel weight. 312 kt true at 35,000 ft. The 81 kt stall has no published weight or flap setting. Fuel consumption and drag constants are estimates."},
+ atr72:{name:"ATR 72-600",W:50705,V:197,S:657,CLmax:2.60,AR:12.0,CD0:0.026,e:0.80,fe:0.5201,ws:6,h:20000,prop:"prop",cp:0.46,eta:0.82,ct:0.60,Fmax:11024,Pmax:15982,tr:45,fc:0.02,
+  note:"23,000 kg (50,705 lb) maximum takeoff weight, 657 ft² wing, 88.75 ft span, 30,314 lb typical operating empty weight, 46,296 lb maximum zero-fuel weight and 5,000 kg usable fuel (ATR). 270 kt true at 20,000 ft. Stall speed is estimated from the published approach speed. Fuel consumption is backed out of ATR's cruise fuel flow. Drag constants are estimates."},
+ b737:{name:"Boeing 737-800",W:174200,V:250,S:1341,CLmax:2.60,AR:9.5,CD0:0.021,e:0.85,fe:0.4625,ws:8,h:35000,prop:"jet",cp:0.50,eta:0.80,ct:0.60,Fmax:46062,Pmax:47000,tr:45,fc:0.025,
+  note:"174,200 lb maximum takeoff weight, 91,300 lb operating empty weight, 138,300 lb maximum zero-fuel weight and 46,062 lb usable fuel (Boeing airport planning document). 1,341 ft² wing, aspect ratio from the 112.6 ft span without winglets, with winglets counted in the span efficiency. About 450 kt true at 35,000 ft. Stall speed, fuel consumption and drag constants are estimates. No compressibility drag is modelled."}
+};
+var PRESET_ORDER=["skyvan","c172","kingair350","atr72","b737"];
 function cla(A){return 2*Math.PI*A/(2+Math.sqrt(4+A*A/0.9025));}
 function sizeWing(W,Vs,CLmax){return 2*W/(RHO*Math.pow(Vs*KT,2)*CLmax);}
-function drag(W,V,S,AR){var q=0.5*RHO*Math.pow(V*KT,2),Dp=q*S*C.CD0,Di=W*W/(q*Math.PI*AR*S*C.e);return {q:q,Dp:Dp,Di:Di,D:Dp+Di};}
-function model(W,V,S,CLmax,AR){
-  var d=drag(W,V,S,AR),b=Math.sqrt(AR*S),c=S/b,a=cla(AR),WS=W/S;
-  var Vs=Math.sqrt(2*W/(RHO*S*CLmax))/KT, mu=2*WS/(RHO*c*a*G0), Kg=0.88*mu/(5.3+mu), n=1+Kg*C.ude*V*a/(498*WS);
-  var K=1/(Math.PI*AR*C.e), LDmax=0.5/Math.sqrt(C.CD0*K), Vmd=Math.sqrt(2*WS/RHO*Math.sqrt(K/C.CD0))/KT;
-  var We=C.fe*W+C.ws*S;
-  return {S:S,b:b,c:c,CLa:a,WS:WS,Vs:Vs,q:d.q,mu:mu,Kg:Kg,n:n,Dp:d.Dp,Di:d.Di,D:d.D,LD:W/d.D,LDmax:LDmax,Vmd:Vmd,We:We,payload:W-We};
+function sigmaAt(h){return h<=36089?Math.pow(1-6.8756e-6*h,4.2559):0.29708*Math.exp(-(h-36089)/20806);}
+function drag(W,V,S,AR,CD0,e){var q=0.5*RHO*Math.pow(V*KT,2),Dp=q*S*CD0,Di=W*W/(q*Math.PI*AR*S*e);return {q:q,Dp:Dp,Di:Di,D:Dp+Di};}
+/* One mission: payload P and fuel F (see docs/payload-range-spec.md) */
+function mission(p,x,P,F){
+  var T=x.We+P+F, Fc=p.fc*T, w1=T-Fc, Fr=0, i, nf, w2;
+  for(i=0;i<50;i++){nf=(p.tr/60)*x.ff(x.We+P+Fr); if(Math.abs(nf-Fr)<0.01){Fr=nf;break;} Fr=nf;}
+  w2=x.We+P+Fr; var Fcr=F-Fc-Fr, R=0;
+  if(Fcr>0){var k=Math.sqrt(x.k2/x.k0), J=(Math.atan(w1*k)-Math.atan(w2*k))/Math.sqrt(x.k0*x.k2); R=x.K*J;}
+  return {P:P,F:F,T:T,Fc:Fc,Fr:Fr,Fcr:Fcr,R:R,w1:w1,w2:w2};
 }
-function evaluate(st){return model(st.W,st.V,st.S,st.CLmax,st.AR);}
-if(typeof module!=="undefined") module.exports={model:model,sizeWing:sizeWing,evaluate:evaluate,REF:REF};
+function model(p){
+  var W=p.W,V=p.V,S=p.S,AR=p.AR;
+  var d=drag(W,V,S,AR,p.CD0,p.e),b=Math.sqrt(AR*S),c=S/b,a=cla(AR),WS=W/S;
+  var Vs=Math.sqrt(2*W/(RHO*S*p.CLmax))/KT, mu=2*WS/(RHO*c*a*G0), Kg=0.88*mu/(5.3+mu), n=1+Kg*UDE*V*a/(498*WS);
+  var K=1/(Math.PI*AR*p.e), LDmax=0.5/Math.sqrt(p.CD0*K), Vmd=Math.sqrt(2*WS/RHO*Math.sqrt(K/p.CD0))/KT;
+  var We=p.fe*W+p.ws*S, U=W-We;
+  var sigma=sigmaAt(p.h), VTAS=V/Math.sqrt(sigma);
+  var isProp=p.prop!=="jet";
+  var x={We:We,k0:d.Dp,k2:1/(d.q*Math.PI*AR*S*p.e)};
+  x.D=function(w){return x.k0+x.k2*w*w;};
+  x.ff=isProp?function(w){return p.cp*x.D(w)*VTAS*KT/(550*p.eta);}:function(w){return p.ct*x.D(w);};
+  x.K=isProp?550*p.eta/(KT*p.cp):VTAS/p.ct;
+  var pr;
+  if(U<=0){var z={P:0,F:0,T:We,Fc:0,Fr:0,Fcr:0,R:0,w1:We,w2:We}; pr={A:z,B:z,C:z,D:z};}
+  else{
+    var Pm=Math.max(0,p.Pmax),Fm=Math.max(0,p.Fmax);
+    var PB=Math.min(Pm,U), FB=Math.min(Fm,U-PB), FC=Math.min(Fm,U), PC=Math.min(Pm,U-FC);
+    pr={A:mission(p,x,PB,0),B:mission(p,x,PB,FB),C:mission(p,x,PC,FC),D:mission(p,x,0,FC)};
+  }
+  var w0=W*(1-p.fc);
+  return {S:S,b:b,c:c,CLa:a,WS:WS,Vs:Vs,q:d.q,mu:mu,Kg:Kg,n:n,Dp:d.Dp,Di:d.Di,D:d.D,LD:W/d.D,LDmax:LDmax,Vmd:Vmd,We:We,U:U,
+    sigma:sigma,VTAS:VTAS,k0:x.k0,k2:x.k2,Krange:x.K,w0:w0,D0:x.D(w0),ff0:x.ff(w0),pr:pr,RB:pr.B.R,RC:pr.C.R,RD:pr.D.R,PC:pr.C.P,PB:pr.B.P};
+}
+function evaluate(st){return model(st);}
+if(typeof module!=="undefined") module.exports={model:model,sizeWing:sizeWing,sigmaAt:sigmaAt,evaluate:evaluate,PRESETS:PRESETS};
 </script>
 
 <script>
@@ -192,124 +270,215 @@ function el(n,a,t){var e=document.createElementNS(NS,n);for(var k in a)e.setAttr
 function fmt(x,d){return x.toLocaleString("en-US",{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
 function sgn(x,d){return (x>=0?"+":"−")+Math.abs(x).toFixed(d);}
 function pct(x){return sgn(x,Math.abs(x)<9.95?1:0)+"%";}
+function sig4(v){if(!(v>0))return v; var p=Math.pow(10,Math.floor(Math.log10(v))-3); return Math.round(v/p)*p;}
+/* auto decimals for numbers spanning many orders of magnitude: whole numbers from 100 up, about 3 significant figures below */
+function fmtA(x){var a=Math.abs(x); return fmt(x,a>=100||a===0?0:Math.max(0,2-Math.floor(Math.log10(a))));}
 
-var RANGE={W:[5000,16000,10],V:[80,240,1],Vs:[40,90,0.5],S:[200,700,1],CLmax:[1.2,3.0,0.05],AR:[6,16,0.5]};
-var base0=model(REF.W,REF.V,REF.S,REF.CLmax,REF.AR);
+/* Ranges. log:true sliders move by ratio and round to 4 significant figures. */
+var RANGE={
+ W:{min:500,max:1300000,log:true}, S:{min:30,max:10000,log:true}, V:{min:40,max:500,step:1}, Vs:{min:25,max:200,step:0.5},
+ CLmax:{min:0.8,max:4.0,step:0.05}, AR:{min:3,max:40,step:0.1}, h:{min:0,max:51000,step:500},
+ CD0:{min:0.008,max:0.12,step:0.001}, e:{min:0.5,max:1.0,step:0.01}, ws:{min:0,max:30,step:0.1}, We:{min:100,max:1000000,log:true},
+ cp:{min:0.25,max:1.2,step:0.01}, eta:{min:0.4,max:0.95,step:0.01}, ct:{min:0.3,max:1.5,step:0.01},
+ Fmax:{min:10,max:400000,log:true}, Pmax:{min:10,max:300000,log:true}, tr:{min:0,max:120,step:5}, fc:{min:0,max:0.08,step:0.001}
+};
+var curPreset="skyvan", REF, base0;
 var st,pinned=null,touched="W",selNode=null;
-function reset(){st={W:REF.W,V:REF.V,S:REF.S,CLmax:REF.CLmax,AR:REF.AR}; pinned=null; touched="W"; selNode=null; render();}
+function copyInputs(o){var r={};["W","V","S","CLmax","AR","CD0","e","fe","ws","h","prop","cp","eta","ct","Fmax","Pmax","tr","fc"].forEach(function(k){r[k]=o[k];});return r;}
+function setRef(o,name){REF=copyInputs(o); REF.name=name; base0=model(REF);}
+function reset(){st=copyInputs(PRESETS[curPreset]); setRef(st,PRESETS[curPreset].name); pinned=null; touched="W"; selNode=null; render();}
+function loadPreset(id){curPreset=id; var s=document.getElementById("preset"); if(s.value!==id) s.value=id; reset();}
 
+/* radar: log scale, 25% at the centre to 400% at the rim */
 var AX=[
- {id:"V",name:"Cruise speed",unit:"kt",d:0,get:function(r){return st.V;},b:REF.V,sense:0},
- {id:"W",name:"Gross weight",unit:"lb",d:0,get:function(r){return st.W;},b:REF.W,sense:0},
- {id:"payload",name:"Payload",unit:"lb",d:0,get:function(r){return r.payload;},b:base0.payload,sense:1},
- {id:"D",name:"Cruise drag",unit:"lb",d:0,get:function(r){return r.D;},b:base0.D,sense:-1},
- {id:"n",name:"Gust load factor",unit:"g",d:2,get:function(r){return r.n;},b:base0.n,sense:-1},
- {id:"S",name:"Wing area",unit:"ft²",d:0,get:function(r){return r.S;},b:REF.S,sense:0},
- {id:"Vs",name:"Stall speed",unit:"kt",d:1,get:function(r){return r.Vs;},b:base0.Vs,sense:-1}
+ {id:"V",name:"Cruise speed (EAS)",unit:"kt",get:function(r){return st.V;},sense:0},
+ {id:"W",name:"Gross weight",unit:"lb",get:function(r){return st.W;},sense:0},
+ {id:"U",name:"Useful load",unit:"lb",get:function(r){return r.U;},sense:1},
+ {id:"D",name:"Cruise drag",unit:"lb",get:function(r){return r.D;},sense:-1},
+ {id:"n",name:"Gust load factor",unit:"g",d:2,get:function(r){return r.n;},sense:-1},
+ {id:"S",name:"Wing area",unit:"ft²",get:function(r){return r.S;},sense:0},
+ {id:"Vs",name:"Stall speed",unit:"kt",d:1,get:function(r){return r.Vs;},sense:-1},
+ {id:"RC",name:"Range, full tanks",unit:"nmi",get:function(r){return r.RC;},sense:1,result:true}
 ];
-var NA=AX.length,CX=300,CY=255,RR=170,PMIN=40,PMAX=160;
+function axBase(a){return a.get===undefined?1:(a.id==="V"||a.id==="W")?REF[a.id]:base0[a.id];}
+var NA=AX.length,CX=300,CY=262,RR=168,PMIN=25,PMAX=400,LSPAN=Math.log(PMAX/PMIN);
 function ang(i){return (-90+i*360/NA)*Math.PI/180;}
-function rad(p){return RR*(Math.min(PMAX,Math.max(PMIN,p))-PMIN)/(PMAX-PMIN);}
+function rad(p){var q=Math.min(PMAX,Math.max(PMIN,p)); return RR*Math.log(q/PMIN)/LSPAN;}
 function pt(i,p){var a=ang(i),r=rad(p);return [CX+r*Math.cos(a),CY+r*Math.sin(a)];}
+function axPct(a,r){var b=axBase(a),v=a.get(r); return b>0?100*v/b:(v>0?PMAX*2:100);}
 var rEls={};
 function buildRadar(){var s=$("#radar"); s.textContent=""; var i;
-  [60,80,100,120,140,160].forEach(function(p){var pts=[];for(i=0;i<NA;i++)pts.push(pt(i,p).join(","));
+  [25,50,100,200,400].forEach(function(p){var pts=[];for(i=0;i<NA;i++)pts.push(pt(i,p).join(","));
     s.appendChild(el("polygon",{points:pts.join(" "),"class":"ring"+(p===100?" base":"")}));
-    var t=pt(0,p); s.appendChild(el("text",{x:t[0]+5,y:t[1]+3,"class":"tick"},p+"%"));});
+    var t=pt(0,p); if(p>25) s.appendChild(el("text",{x:t[0]+5,y:t[1]+3,"class":"tick"},p+"%"));});
   for(i=0;i<NA;i++){var o=pt(i,PMAX); s.appendChild(el("line",{x1:CX,y1:CY,x2:o[0],y2:o[1],"class":"spoke"}));}
   rEls.pin=el("polygon",{"class":"pinshape",points:""}); s.appendChild(rEls.pin);
   rEls.shape=el("polygon",{"class":"shape",points:""}); s.appendChild(rEls.shape);
   rEls.dots=[];rEls.lab=[];
   AX.forEach(function(a,i){var an=ang(i),lx=CX+(RR+16)*Math.cos(an),ly=CY+(RR+16)*Math.sin(an),c=Math.cos(an);
     var anchor=Math.abs(c)<0.2?"middle":(c>0?"start":"end"); var dy=Math.sin(an)<-0.5?-34:(Math.sin(an)>0.5?14:-12);
-    var t1=el("text",{x:lx,y:ly+dy,"text-anchor":anchor,"class":"ax-name"},a.name);
-    var t2=el("text",{x:lx,y:ly+dy+16,"text-anchor":anchor,"class":"ax-val"}); var t3=el("text",{x:lx,y:ly+dy+31,"text-anchor":anchor,"class":"ax-d"});
-    s.appendChild(t1);s.appendChild(t2);s.appendChild(t3); rEls.lab.push([t2,t3]);});
-  AX.forEach(function(a,i){var c=el("circle",{r:9,"class":"handle","data-i":i,tabindex:"0",role:"slider","aria-label":a.name});
+    s.appendChild(el("text",{x:lx,y:ly+dy,"text-anchor":anchor,"class":"ax-name"},a.name));
+    var t2=el("text",{x:lx,y:ly+dy+16,"text-anchor":anchor,"class":"ax-val"}), t3=el("text",{x:lx,y:ly+dy+31,"text-anchor":anchor,"class":"ax-d"});
+    s.appendChild(t2);s.appendChild(t3); rEls.lab.push([t2,t3]);});
+  AX.forEach(function(a,i){var c=a.result?el("circle",{r:5,"class":"dot","data-i":i}):el("circle",{r:9,"class":"handle","data-i":i,tabindex:"0",role:"slider","aria-label":a.name});
     s.appendChild(c); rEls.dots.push(c);});
 }
+function axText(a,v){return (a.d!=null?fmt(v,a.d):fmtA(v))+" "+a.unit;}
 function renderRadar(r){var pts=[];
-  AX.forEach(function(a,i){var v=a.get(r),p=100*v/a.b,xy=pt(i,p); pts.push(xy.join(","));
+  AX.forEach(function(a,i){var v=a.get(r),p=axPct(a,r),xy=pt(i,p); pts.push(xy.join(","));
     var dot=rEls.dots[i]; dot.setAttribute("cx",xy[0]);dot.setAttribute("cy",xy[1]);
-    var vt=fmt(v,a.d)+" "+a.unit;
+    var vt=axText(a,v), d=p-100, t=rEls.lab[i][1];
     rEls.lab[i][0].textContent=vt;
-    var d=p-100,t=rEls.lab[i][1]; t.textContent=Math.abs(d)<0.05?"start":pct(d)+(p>PMAX||p<PMIN?" (off scale)":"");
+    t.textContent=axBase(a)>0?(Math.abs(d)<0.05?"reference":pct(d)+(p>PMAX||p<PMIN?" (off scale)":"")):"no reference value";
     t.style.fill=a.sense*d>0.05?"var(--good)":a.sense*d<-0.05?"var(--bad)":"var(--muted)";
-    dot.setAttribute("aria-valuenow",p.toFixed(1)); dot.setAttribute("aria-valuemin",PMIN); dot.setAttribute("aria-valuemax",PMAX);
-    dot.setAttribute("aria-valuetext",vt+", "+t.textContent+" from stock");});
+    if(!a.result){dot.setAttribute("aria-valuenow",p.toFixed(1)); dot.setAttribute("aria-valuemin",PMIN); dot.setAttribute("aria-valuemax",PMAX);
+      dot.setAttribute("aria-valuetext",vt+", "+t.textContent+(t.textContent==="reference"?"":" from reference"));}});
   rEls.shape.setAttribute("points",pts.join(" "));
-  if(pinned){var pp=[];AX.forEach(function(a,i){pp.push(pt(i,100*pinned[a.id]/a.b).join(","));});rEls.pin.setAttribute("points",pp.join(" "));}
+  if(pinned){var pp=[];AX.forEach(function(a,i){var b=axBase(a); pp.push(pt(i,b>0?100*pinned[a.id]/b:100).join(","));});rEls.pin.setAttribute("points",pp.join(" "));}
   else rEls.pin.setAttribute("points","");
 }
-function clampSet(id,v){var R=RANGE[id]; v=Math.round(v/R[2])*R[2]; v=Math.min(R[1],Math.max(R[0],v)); st[id]=+v.toFixed(4);}
-var MOVES={Vs:"S",payload:"W",D:"V",n:"V"};
+
+/* setting values */
+function roundTo(id,v){var R=RANGE[id]; v=R.log?sig4(v):Math.round(v/R.step)*R.step; return Math.min(R.max,Math.max(R.min,v));}
+function clampSet(id,v){st[id]=+roundTo(id,v).toPrecision(10);}
+var MOVES={Vs:"S",U:"W",D:"V",n:"V",We:"fe"};
 function setInput(id,v){
+  if(!isFinite(v)) {render(); return;}
   if(id==="Vs"){clampSet("S",sizeWing(st.W,v,st.CLmax));}
-  else if(id==="payload"){clampSet("W",(v+C.ws*st.S)/(1-C.fe));}
-  else if(id==="n"){var r0=model(st.W,st.V,st.S,st.CLmax,st.AR),k=(r0.n-1)/st.V;clampSet("V",(v-1)/k);}
-  else if(id==="D"){var r1=model(st.W,RANGE.V[0],st.S,st.CLmax,st.AR),lo=Math.max(RANGE.V[0],r1.Vmd),hi=RANGE.V[1],dd=function(x){return drag(st.W,x,st.S,st.AR).D;};
-    if(v<=dd(lo)) clampSet("V",lo); else if(v>=dd(hi)) clampSet("V",hi); else {for(var i=0;i<60;i++){var mid=(lo+hi)/2; if(dd(mid)<v) lo=mid; else hi=mid;} clampSet("V",(lo+hi)/2);} }
+  else if(id==="U"){clampSet("W",(v+st.ws*st.S)/(1-st.fe));}
+  else if(id==="n"){var r0=model(st),k=(r0.n-1)/st.V;clampSet("V",(v-1)/k);}
+  else if(id==="D"){
+    /* Solve on the fast side of minimum drag, where drag rises with speed. If minimum drag is above the top of the speed range,
+       the whole range is on the slow side, where drag falls with speed; solve there instead. */
+    var Vlo=RANGE.V.min,Vhi=RANGE.V.max,Vmd=model(st).Vmd,dd=function(x){return drag(st.W,x,st.S,st.AR,st.CD0,st.e).D;};
+    var fast=Vmd<Vhi, lo=fast?Math.max(Vlo,Vmd):Vlo, hi=Vhi, dLo=dd(lo), dHi=dd(hi), dMin=Math.min(dLo,dHi), dMax=Math.max(dLo,dHi);
+    if(v<=dMin) clampSet("V",fast?lo:hi); else if(v>=dMax) clampSet("V",fast?hi:lo);
+    else {for(var i=0;i<60;i++){var mid=(lo+hi)/2; if((dd(mid)<v)===fast) lo=mid; else hi=mid;} clampSet("V",(lo+hi)/2);} }
+  else if(id==="We"){var We=roundTo("We",v); st.fe=+Math.min(0.95,Math.max(0,(We-st.ws*st.S)/st.W)).toFixed(6);}
   else clampSet(id,v);
   touched=MOVES[id]||id; render();}
-/* Keyboard step: 1 percentage point of the stock value, the same unit as the radar's rings.
-   (A step of 1% of the current value runs backwards when the value is negative and vanishes near zero.)
-   If rounding to the slider step swallows the move, take bigger steps until something changes. */
-function stepHandle(a,dir){var cur=a.get(evaluate(st)),before=JSON.stringify(st),k;
-  for(k=1;k<=10;k++){setInput(a.id,cur+dir*k*0.01*a.b); if(JSON.stringify(st)!==before) break;}}
+/* Keyboard step: 1% of the reference value or of the current value, whichever is bigger, so it never vanishes near zero
+   and still moves far from the reference. Direction comes from the key, never from the sign of the value.
+   If rounding swallows the move, take bigger steps until something changes. */
+function stepHandle(a,dir){var cur=a.get(evaluate(st)),unit=0.01*Math.max(Math.abs(axBase(a)),Math.abs(cur)),before=JSON.stringify(st),k;
+  for(k=1;k<=10;k++){setInput(a.id,cur+dir*k*unit); if(JSON.stringify(st)!==before) break;}}
 (function(){var s=$("#radar"),act=-1;
   s.addEventListener("pointerdown",function(ev){var t=ev.target; if(t.classList&&t.classList.contains("handle")){act=+t.getAttribute("data-i"); s.setPointerCapture(ev.pointerId); ev.preventDefault();}});
-  s.addEventListener("pointermove",function(ev){ if(act<0) return; var bb=s.getBoundingClientRect(),x=(ev.clientX-bb.left)*600/bb.width,y=(ev.clientY-bb.top)*510/bb.height;
-    var a=ang(act),proj=(x-CX)*Math.cos(a)+(y-CY)*Math.sin(a),p=PMIN+(PMAX-PMIN)*Math.min(RR,Math.max(0,proj))/RR; setInput(AX[act].id,AX[act].b*p/100);});
+  s.addEventListener("pointermove",function(ev){ if(act<0) return; var bb=s.getBoundingClientRect(),x=(ev.clientX-bb.left)*600/bb.width,y=(ev.clientY-bb.top)*520/bb.height;
+    var a=ang(act),proj=(x-CX)*Math.cos(a)+(y-CY)*Math.sin(a),p=PMIN*Math.exp(LSPAN*Math.min(RR,Math.max(0,proj))/RR); setInput(AX[act].id,axBase(AX[act])*p/100);});
   s.addEventListener("pointerup",function(){act=-1;}); s.addEventListener("pointercancel",function(){act=-1;});
   s.addEventListener("keydown",function(ev){var t=ev.target; if(!(t.classList&&t.classList.contains("handle"))) return;
     var dir=(ev.key==="ArrowUp"||ev.key==="ArrowRight")?1:(ev.key==="ArrowDown"||ev.key==="ArrowLeft")?-1:0; if(dir){stepHandle(AX[+t.getAttribute("data-i")],dir); ev.preventDefault();}});
 })();
 
-var SL={Vs:["Stall speed","kt",1],S:["Wing area","ft²",0],W:["Gross weight","lb",0],V:["Cruise speed","kt",0],CLmax:["Maximum lift coefficient","",2],AR:["Aspect ratio","",1]};
-var ORDER=["Vs","S","W","V","CLmax","AR"],sEls={};
-function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:st[id];}
-function buildSliders(){var box=$("#sliders"); box.textContent=""; sEls={};
-  ORDER.forEach(function(id){var d=document.createElement("div"); d.className="row";
-    var l=document.createElement("label"); l.htmlFor="s_"+id; l.textContent=SL[id][0];
+/* controls. scale: displayed value = stored value × scale (fc is stored as a fraction, shown in %) */
+var SL={
+ Vs:{label:"Stall speed",unit:"kt",dec:1,hint:"Changing this resizes the wing to give that stall speed."},
+ S:{label:"Wing area",unit:"ft²",auto:true},
+ W:{label:"Gross weight",unit:"lb",auto:true,hint:"Maximum takeoff weight."},
+ V:{label:"Cruise speed, equivalent",unit:"kt",dec:0,hint:"Equivalent airspeed. True airspeed follows from the altitude."},
+ CLmax:{label:"Maximum lift coefficient",unit:"",dec:2,hint:"Landing configuration. Changes the stall speed."},
+ AR:{label:"Aspect ratio",unit:"",dec:1,hint:"Span squared divided by wing area. Slender wings have a high value."},
+ h:{label:"Cruise altitude",unit:"ft",dec:0,hint:"Sets the true airspeed and so the range. Drag at a given equivalent airspeed doesn't change."},
+ CD0:{label:"Zero-lift drag coefficient",unit:"",dec:3},
+ e:{label:"Span efficiency",unit:"",dec:2},
+ We:{label:"Empty weight",unit:"lb",auto:true,hint:"Setting this changes the fixed part of the empty-weight rule."},
+ ws:{label:"Empty weight per ft² of wing",unit:"lb/ft²",dec:1,hint:"How much empty weight grows when the wing grows."},
+ cp:{label:"Brake specific fuel consumption",unit:"lb/hp/h",dec:2,prop:true},
+ eta:{label:"Propeller efficiency",unit:"",dec:2,prop:true},
+ ct:{label:"Thrust specific fuel consumption",unit:"lb/lbf/h",dec:2,jet:true},
+ Fmax:{label:"Maximum fuel",unit:"lb",auto:true},
+ Pmax:{label:"Maximum payload",unit:"lb",auto:true,hint:"Structural or cabin limit. Crew counts as payload."},
+ tr:{label:"Reserve",unit:"min",dec:0,hint:"Flown at cruise fuel flow."},
+ fc:{label:"Takeoff and climb fuel",unit:"% TOW",dec:1,scale:100,hint:"Percent of takeoff weight. Burned with no range credit."}
+};
+var GROUPS={sliders:["Vs","S","W","V","CLmax","AR","h"],constSliders:["CD0","e","We","ws"],prSliders:["cp","eta","ct","Fmax","Pmax","tr","fc"]};
+var sEls={};
+function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:id==="We"?r.We:st[id];}
+function toPos(id,v){var R=RANGE[id]; return R.log?1000*Math.log(Math.max(R.min,v)/R.min)/Math.log(R.max/R.min):v;}
+function fromPos(id,t){var R=RANGE[id]; return R.log?R.min*Math.pow(R.max/R.min,t/1000):t;}
+function showVal(id,v){var c=SL[id],x=v*(c.scale||1); return c.auto?(Math.abs(x)>=1000?String(Math.round(x)):String(+x.toPrecision(4))):x.toFixed(c.dec);}
+function buildSliders(){sEls={};
+  Object.keys(GROUPS).forEach(function(g){var box=document.getElementById(g); box.textContent="";
+  GROUPS[g].forEach(function(id){var c=SL[id],R=RANGE[id],sc=c.scale||1,d=document.createElement("div"); d.className="row";
+    var l=document.createElement("label"); l.htmlFor="s_"+id; l.textContent=c.label;
     var v=document.createElement("span"); v.className="v"; d.appendChild(l); d.appendChild(v);
-    var num=document.createElement("input"); num.type="number"; num.id="n_"+id; num.min=RANGE[id][0]; num.max=RANGE[id][1]; num.step="any"; num.setAttribute("aria-label",SL[id][0]+" value"); num.inputMode="decimal";
-    var unit=document.createElement("span"); unit.className="u"; unit.textContent=SL[id][1]; v.appendChild(num); v.appendChild(unit);
-    num.addEventListener("change",function(){var x=parseFloat(num.value); if(isFinite(x)) setInput(id,x); else render();});
-    /* Esc: put the current value back before blurring, so the blur's change event has nothing to apply. */
-    num.addEventListener("keydown",function(ev){if(ev.key==="Enter"){num.blur();} else if(ev.key==="Escape"){num.value=(+curVal(id,evaluate(st))).toFixed(SL[id][2]); num.blur();}});
-    var inp=document.createElement("input"); inp.type="range"; inp.id="s_"+id; inp.min=RANGE[id][0]; inp.max=RANGE[id][1]; inp.step=RANGE[id][2];
-    inp.addEventListener("input",function(){setInput(id,+inp.value);}); d.appendChild(inp);
-    var h=document.createElement("span"); h.className="hint"; d.appendChild(h); box.appendChild(d); sEls[id]={v:v,num:num,inp:inp,h:h};});
-  sEls.AR.h.textContent="Span squared divided by wing area. Slender wings have a high value.";
-  sEls.CLmax.h.textContent="Powered, flaps down. Changes the stall speed.";
-  sEls.Vs.h.textContent="Changing this resizes the wing to give that stall speed.";
+    var num=document.createElement("input"); num.type="number"; num.id="n_"+id; num.min=R.min*sc; num.max=R.max*sc; num.step="any"; num.setAttribute("aria-label",c.label+" value"); num.inputMode="decimal";
+    var unit=document.createElement("span"); unit.className="u"; unit.textContent=c.unit; v.appendChild(num); v.appendChild(unit);
+    num.addEventListener("change",function(){var x=parseFloat(num.value); if(isFinite(x)) setInput(id,x/sc); else render();});
+    num.addEventListener("keydown",function(ev){if(ev.key==="Enter"){num.blur();} else if(ev.key==="Escape"){num.value=showVal(id,curVal(id,evaluate(st))); num.blur();}});
+    var inp=document.createElement("input"); inp.type="range"; inp.id="s_"+id;
+    if(R.log){inp.min=0;inp.max=1000;inp.step=1;} else {inp.min=R.min;inp.max=R.max;inp.step=R.step;}
+    inp.addEventListener("input",function(){setInput(id,fromPos(id,+inp.value));}); d.appendChild(inp);
+    if(c.hint){var h=document.createElement("span"); h.className="hint"; h.textContent=c.hint; d.appendChild(h);}
+    box.appendChild(d); sEls[id]={row:d,num:num,inp:inp};});});
 }
-function renderSliders(r){ORDER.forEach(function(id){var e=sEls[id],val=curVal(id,r);
-  if(document.activeElement!==e.num) e.num.value=(+val).toFixed(SL[id][2]); if(document.activeElement!==e.inp) e.inp.value=val;});}
+function renderSliders(r){Object.keys(sEls).forEach(function(id){var e=sEls[id],val=curVal(id,r),c=SL[id];
+  e.row.hidden=(c.prop&&st.prop==="jet")||(c.jet&&st.prop!=="jet");
+  if(document.activeElement!==e.num) e.num.value=showVal(id,val); if(document.activeElement!==e.inp) e.inp.value=toPos(id,val);});
+  $("#bProp").setAttribute("aria-pressed",st.prop!=="jet"); $("#bJet").setAttribute("aria-pressed",st.prop==="jet");}
+$("#bProp").addEventListener("click",function(){st.prop="prop"; touched="W"; render();});
+$("#bJet").addEventListener("click",function(){st.prop="jet"; touched="W"; render();});
 
-function renderTiles(r){var T=[["Wing loading",r.WS.toFixed(1)+" lb/ft²",r.WS,base0.WS],["Span",r.b.toFixed(1)+" ft",r.b,base0.b],["Empty weight",fmt(r.We)+" lb",r.We,base0.We],
-  ["Lift to drag at cruise",r.LD.toFixed(1),r.LD,base0.LD],["Best lift to drag",r.LDmax.toFixed(1),r.LDmax,base0.LDmax],["Minimum drag speed",fmt(r.Vmd)+" kt",r.Vmd,base0.Vmd]];
-  $("#tiles").innerHTML=T.map(function(t){var d=100*(t[2]/t[3]-1);return '<div class="tile"><div class="k">'+t[0]+'</div><div class="n">'+t[1]+'</div><div class="d">'+(Math.abs(d)<0.05?"start":pct(d))+'</div></div>';}).join("");
+function tileHTML(t){var d=t[3]>0?100*(t[2]/t[3]-1):NaN;return '<div class="tile"><div class="k">'+t[0]+'</div><div class="n">'+t[1]+'</div><div class="d">'+(isNaN(d)?"–":Math.abs(d)<0.05?"reference":pct(d))+'</div></div>';}
+function renderTiles(r){var T=[["Wing loading",r.WS.toFixed(1)+" lb/ft²",r.WS,base0.WS],["Span",fmtA(r.b)+" ft",r.b,base0.b],["Empty weight",fmtA(r.We)+" lb",r.We,base0.We],
+  ["Lift to drag at cruise",r.LD.toFixed(1),r.LD,base0.LD],["Best lift to drag",r.LDmax.toFixed(1),r.LDmax,base0.LDmax],["Minimum drag speed",fmt(r.Vmd)+" kt",r.Vmd,base0.Vmd],["True airspeed",fmt(r.VTAS)+" kt",r.VTAS,base0.VTAS]];
+  $("#tiles").innerHTML=T.map(tileHTML).join("");
+  var P=[["Range, max payload",fmt(r.RB)+" nmi",r.RB,base0.RB],["Payload, full tanks",fmtA(r.PC)+" lb",r.PC,base0.PC],["Range, full tanks",fmt(r.RC)+" nmi",r.RC,base0.RC],["Ferry range",fmt(r.RD)+" nmi",r.RD,base0.RD],["Cruise fuel flow",fmtA(r.ff0)+" lb/h",r.ff0,base0.ff0]];
+  $("#prTiles").innerHTML=P.map(tileHTML).join("");
+  var w=[]; if(r.U<=0) w.push("Empty weight is at or above gross weight, so there is no useful load.");
+  else { if(r.pr.B.F>0&&r.RB===0) w.push("At maximum payload, the climb allowance and reserve use all the fuel that fits."); if(st.V<r.Vs) w.push("Cruise speed is below the stall speed."); }
+  $("#prWarn").textContent=w.join(" ");
 }
 
-/* drag curve */
-var CV={x0:56,x1:884,y0:286,y1:14,vmin:40,vmax:260,dmax:3600};
-function cx(v){return CV.x0+(CV.x1-CV.x0)*(v-CV.vmin)/(CV.vmax-CV.vmin);}
-function cy(d){return CV.y0-(CV.y0-CV.y1)*Math.min(d,CV.dmax)/CV.dmax;}
-function curvePath(W,S,AR,vs,key){var p="",v;for(v=Math.max(CV.vmin,vs);v<=CV.vmax+0.01;v+=2){var d=drag(W,v,S,AR)[key];p+=(p?"L":"M")+cx(v).toFixed(1)+" "+cy(d).toFixed(1);}return p;}
+/* chart helpers */
+function niceStep(x){var p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p; return (f<1.5?1:f<3?2:f<7?5:10)*p;}
+function niceAxis(maxv,n){var s=niceStep(maxv/(n||5)); return {step:s,max:Math.max(s,Math.ceil(maxv/s)*s)};}
+function tickLabel(v){return v>=10000?fmt(v/1000)+"k":fmt(v);}
+
+/* drag curve: axes scale to the current aircraft */
+var CV={x0:62,x1:884,y0:286,y1:14};
 function renderCurve(r){var s=$("#curve"); s.textContent=""; var v,d;
-  for(d=0;d<=CV.dmax;d+=600){s.appendChild(el("line",{x1:CV.x0,x2:CV.x1,y1:cy(d),y2:cy(d),"class":"gl"}));s.appendChild(el("text",{x:CV.x0-8,y:cy(d)+4,"text-anchor":"end","class":"tk"},fmt(d)));}
-  for(v=40;v<=260;v+=20){s.appendChild(el("text",{x:cx(v),y:CV.y0+16,"text-anchor":"middle","class":"tk"},v));}
-  s.appendChild(el("text",{x:CV.x1,y:CV.y0+32,"text-anchor":"end","class":"tk"},"Speed, kt")); s.appendChild(el("text",{x:CV.x0,y:10,"class":"tk"},"Drag, lb"));
-  s.appendChild(el("path",{d:curvePath(REF.W,REF.S,REF.AR,base0.Vs,"D"),"class":"cb"}));
-  s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"Dp"),"class":"c1"}));
-  s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"Di"),"class":"c2"}));
-  s.appendChild(el("path",{d:curvePath(st.W,r.S,st.AR,r.Vs,"D"),"class":"ct"}));
-  var xs=cx(Math.max(CV.vmin,r.Vs)); s.appendChild(el("line",{x1:xs,x2:xs,y1:CV.y1,y2:CV.y0,"class":"vs"}));
+  var dmin=2*Math.sqrt(r.Dp*r.Di)*1; // minimum total drag at this weight
+  var vx=niceAxis(Math.max(1.5*st.V,1.9*r.Vmd,1.4*r.Vs),8), dy=niceAxis(Math.max(2.2*dmin,1.15*r.D),6);
+  var vmax=vx.max,dmax=dy.max;
+  var cx=function(v){return CV.x0+(CV.x1-CV.x0)*v/vmax;}, cy=function(d){return CV.y0-(CV.y0-CV.y1)*Math.min(d,dmax)/dmax;};
+  var path=function(p,vs,key){var out="",i,N=140,v0=Math.max(vs,vmax*0.02);for(i=0;i<=N;i++){var vv=v0+(vmax-v0)*i/N,dd=drag(p.W,vv,p.S,p.AR,p.CD0,p.e)[key];out+=(out?"L":"M")+cx(vv).toFixed(1)+" "+cy(dd).toFixed(1);}return out;};
+  for(d=0;d<=dmax+1e-9;d+=dy.step){s.appendChild(el("line",{x1:CV.x0,x2:CV.x1,y1:cy(d),y2:cy(d),"class":"gl"}));s.appendChild(el("text",{x:CV.x0-8,y:cy(d)+4,"text-anchor":"end","class":"tk"},tickLabel(d)));}
+  for(v=0;v<=vmax+1e-9;v+=vx.step){s.appendChild(el("text",{x:cx(v),y:CV.y0+16,"text-anchor":"middle","class":"tk"},fmt(v)));}
+  s.appendChild(el("text",{x:CV.x1,y:CV.y0+32,"text-anchor":"end","class":"tk"},"Equivalent airspeed, kt")); s.appendChild(el("text",{x:CV.x0,y:10,"class":"tk"},"Drag, lb"));
+  s.appendChild(el("path",{d:path(REF,base0.Vs,"D"),"class":"cb"}));
+  s.appendChild(el("path",{d:path(st,r.Vs,"Dp"),"class":"c1"}));
+  s.appendChild(el("path",{d:path(st,r.Vs,"Di"),"class":"c2"}));
+  s.appendChild(el("path",{d:path(st,r.Vs,"D"),"class":"ct"}));
+  var xs=cx(Math.min(vmax,r.Vs)); s.appendChild(el("line",{x1:xs,x2:xs,y1:CV.y1,y2:CV.y0,"class":"vs"}));
   s.appendChild(el("text",{x:xs+6,y:CV.y1+12,"class":"lb"},"Stall "+r.Vs.toFixed(1)+" kt"));
-  var xm=cx(r.Vmd),ym=cy(drag(st.W,r.Vmd,r.S,st.AR).D); if(r.Vmd>r.Vs){s.appendChild(el("circle",{cx:xm,cy:ym,r:4,"class":"md"})); s.appendChild(el("text",{x:xm,y:ym-10,"text-anchor":"middle","class":"lb"},"Minimum drag"));}
+  var ym=cy(drag(st.W,r.Vmd,r.S,st.AR,st.CD0,st.e).D); if(r.Vmd>r.Vs&&r.Vmd<vmax){s.appendChild(el("circle",{cx:cx(r.Vmd),cy:ym,r:4,"class":"md"})); s.appendChild(el("text",{x:cx(r.Vmd),y:ym+18,"text-anchor":"middle","class":"lb"},"Minimum drag"));}
   var xc=cx(st.V),yc=cy(r.D); s.appendChild(el("circle",{cx:xc,cy:yc,r:7,"class":"cr"}));
-  s.appendChild(el("text",{x:xc,y:yc-12,"text-anchor":"middle","class":"lb b"},"Cruise "+fmt(r.D)+" lb"));
+  s.appendChild(el("text",{x:xc,y:yc-12,"text-anchor":"middle","class":"lb b"},"Cruise "+fmtA(r.D)+" lb"));
+  window.__curveAxes={vmax:vmax,dmax:dmax};
+}
+
+/* payload-range chart */
+var PRV={x0:62,x1:620,y0:296,y1:18};
+function renderPR(r){var s=$("#prchart"); s.textContent="";
+  var pts=function(m){return [m.pr.A,m.pr.B,m.pr.C,m.pr.D];};
+  var all=pts(r).concat(pts(base0));
+  var rx=niceAxis(Math.max(1,Math.max.apply(null,all.map(function(p){return p.R;}))*1.05),6), py=niceAxis(Math.max(1,Math.max.apply(null,all.map(function(p){return p.P;}))*1.12),5);
+  var X=function(v){return PRV.x0+(PRV.x1-PRV.x0)*v/rx.max;}, Y=function(v){return PRV.y0-(PRV.y0-PRV.y1)*v/py.max;}, v;
+  for(v=0;v<=py.max+1e-9;v+=py.step){s.appendChild(el("line",{x1:PRV.x0,x2:PRV.x1,y1:Y(v),y2:Y(v),"class":"gl"}));s.appendChild(el("text",{x:PRV.x0-8,y:Y(v)+4,"text-anchor":"end","class":"tk"},tickLabel(v)));}
+  for(v=0;v<=rx.max+1e-9;v+=rx.step){s.appendChild(el("text",{x:X(v),y:PRV.y0+16,"text-anchor":"middle","class":"tk"},tickLabel(v)));}
+  s.appendChild(el("text",{x:PRV.x1,y:PRV.y0+34,"text-anchor":"end","class":"tk"},"Range, nmi")); s.appendChild(el("text",{x:PRV.x0,y:10,"class":"tk"},"Payload, lb"));
+  var line=function(m){return pts(m).map(function(p,i){return (i?"L":"M")+X(p.R).toFixed(1)+" "+Y(p.P).toFixed(1);}).join("");};
+  s.appendChild(el("path",{d:line(base0),"class":"cb"}));
+  if(r.U>0){var pp=pts(r); s.appendChild(el("path",{d:line(r)+"L"+X(pp[3].R).toFixed(1)+" "+Y(0)+"L"+X(0)+" "+Y(0)+"Z","class":"prfill"}));
+    s.appendChild(el("path",{d:line(r),"class":"ct"}));
+    var lab=[["B",pp[1]],["C",pp[2]],["D",pp[3]]], seen={};
+    lab.forEach(function(L){var p=L[1],key=Math.round(X(p.R))+","+Math.round(Y(p.P)); var name=seen[key]?seen[key]+"="+L[0]:L[0]; seen[key]=name;
+      s.appendChild(el("circle",{cx:X(p.R),cy:Y(p.P),r:4.5,"class":"md"}));});
+    Object.keys(seen).forEach(function(key){var xy=key.split(","),p=lab.filter(function(L){return seen[key].indexOf(L[0])>=0;})[0][1];
+      var right=+xy[0]>PRV.x1-90; s.appendChild(el("text",{x:+xy[0]+(right?-8:8),y:+xy[1]-8,"text-anchor":right?"end":"start","class":"lb b"},seen[key]+": "+fmt(p.R)+" nmi"));});
+  }
 }
 
 /* map */
@@ -317,23 +486,23 @@ var NODES,EDGES,mEls={};
 function buildMap(){var X=function(c){return 8+c*150;};
   NODES=[
    {id:"Vs",label:"Stall speed",x:X(1),y:60,v:function(r){return r.Vs.toFixed(1)+" kt";}},
-   {id:"S",label:"Wing area",x:X(0),y:16,inp:true,v:function(r){return fmt(r.S)+" ft²";}},
-   {id:"W",label:"Gross weight",x:X(0),y:90,inp:true,v:function(r){return fmt(st.W)+" lb";}},
+   {id:"S",label:"Wing area",x:X(0),y:16,inp:true,v:function(r){return fmtA(r.S)+" ft²";}},
+   {id:"W",label:"Gross weight",x:X(0),y:90,inp:true,v:function(r){return fmtA(st.W)+" lb";}},
    {id:"CLmax",label:"Max lift coefficient",x:X(0),y:164,inp:true,v:function(r){return st.CLmax.toFixed(2);}},
    {id:"AR",label:"Aspect ratio",x:X(0),y:238,inp:true,v:function(r){return st.AR.toFixed(1);}},
-   {id:"V",label:"Cruise speed",x:X(0),y:312,inp:true,v:function(r){return fmt(st.V)+" kt";}},
+   {id:"V",label:"Cruise speed (EAS)",x:X(0),y:312,inp:true,v:function(r){return fmt(st.V)+" kt";}},
    {id:"q",label:"Dynamic pressure",x:X(1),y:312,v:function(r){return r.q.toFixed(1)+" lb/ft²";}},
-   {id:"b",label:"Span",x:X(2),y:16,v:function(r){return r.b.toFixed(1)+" ft";}},
+   {id:"b",label:"Span",x:X(2),y:16,v:function(r){return fmtA(r.b)+" ft";}},
    {id:"WS",label:"Wing loading",x:X(2),y:150,v:function(r){return r.WS.toFixed(1)+" lb/ft²";}},
-   {id:"Di",label:"Induced drag",x:X(3),y:16,v:function(r){return fmt(r.Di)+" lb";}},
+   {id:"Di",label:"Induced drag",x:X(3),y:16,v:function(r){return fmtA(r.Di)+" lb";}},
    {id:"n",label:"Gust load factor",x:X(3),y:120,v:function(r){return r.n.toFixed(2)+" g";}},
-   {id:"Dp",label:"Parasite drag",x:X(3),y:224,v:function(r){return fmt(r.Dp)+" lb";}},
-   {id:"We",label:"Empty weight",x:X(4),y:312,v:function(r){return fmt(r.We)+" lb";}},
-   {id:"D",label:"Cruise drag",x:X(4),y:120,v:function(r){return fmt(r.D)+" lb";}},
+   {id:"Dp",label:"Parasite drag",x:X(3),y:224,v:function(r){return fmtA(r.Dp)+" lb";}},
+   {id:"We",label:"Empty weight",x:X(4),y:312,v:function(r){return fmtA(r.We)+" lb";}},
+   {id:"D",label:"Cruise drag",x:X(4),y:120,v:function(r){return fmtA(r.D)+" lb";}},
    {id:"LD",label:"Lift to drag",x:X(5),y:120,v:function(r){return r.LD.toFixed(1);}},
-   {id:"payload",label:"Payload",x:X(5),y:312,v:function(r){return fmt(r.payload)+" lb";}}];
+   {id:"U",label:"Useful load",x:X(5),y:312,v:function(r){return fmtA(r.U)+" lb";}}];
   EDGES=[["S","Vs"],["W","Vs"],["CLmax","Vs"],["V","q"],["S","b"],["AR","b"],["S","WS"],["W","WS"],["WS","n"],["V","n"],["AR","n"],["S","Dp"],["q","Dp"],["b","Di"],["W","Di"],["q","Di"],
-    ["Dp","D"],["Di","D"],["S","We"],["W","We"],["We","payload"],["W","payload"],["D","LD"],["W","LD"]];
+    ["Dp","D"],["Di","D"],["S","We"],["W","We"],["We","U"],["W","U"],["D","LD"],["W","LD"]];
   var s=$("#map"); s.textContent=""; mEls={n:{},e:[]}; var by={}; NODES.forEach(function(n){by[n.id]=n;});
   EDGES.forEach(function(e){var a=by[e[0]],b=by[e[1]],x1=a.x+128,y1=a.y+23,x2=b.x,y2=b.y+23,mx=(x1+x2)/2;
     var path=el("path",{d:"M"+x1+" "+y1+" C"+mx+" "+y1+" "+mx+" "+y2+" "+x2+" "+y2,"class":"edge"}); s.appendChild(path); mEls.e.push([e,path]);});
@@ -359,7 +528,7 @@ function renderMap(r){var id,m;
       else x[1].classList.add("dim");});
     key.innerHTML='<span><i class="s"></i>'+mEls.n[selNode].n.label+'</span><span><i class="u"></i>Affects it ('+Object.keys(up).length+')</span><span><i class="d"></i>It affects ('+Object.keys(dn).length+')</span>';
   } else {
-    var hot={}; hot[touched]=1; var ch=true;
+    var hot={}; hot[mEls.n[touched]?touched:"W"]=1; var ch=true;
     while(ch){ch=false;EDGES.forEach(function(e){if(hot[e[0]]&&!hot[e[1]]){hot[e[1]]=1;ch=true;}});}
     for(id in mEls.n){mEls.n[id].g.classList.toggle("hot",!!hot[id]);}
     mEls.e.forEach(function(x){x[1].classList.toggle("hot",!!hot[x[0][0]]);});
@@ -368,45 +537,65 @@ function renderMap(r){var id,m;
 }
 
 function renderSens(r){var ins=["S","W","V","CLmax","AR"];
-  var outs=[["Vs","Stall speed",-1],["payload","Payload",1],["Dp","Parasite drag",-1],["Di","Induced drag",-1],["D","Cruise drag",-1],["n","Gust factor",-1]];
+  var outs=[["Vs","Stall speed",-1],["U","Useful load",1],["Dp","Parasite drag",-1],["Di","Induced drag",-1],["D","Cruise drag",-1],["n","Gust factor",-1],["RB","Range, max payload",1],["RD","Ferry range",1]];
   $("#sens thead").innerHTML="<tr><th>1% more</th>"+outs.map(function(o){return '<th class="num">'+o[1]+"</th>";}).join("")+"</tr>";
   $("#sens tbody").innerHTML=ins.map(function(id){var s2={};for(var k in st)s2[k]=st[k]; s2[id]=st[id]*1.001; var r2=evaluate(s2);
-    return "<tr><td>"+SL[id][0]+"</td>"+outs.map(function(o){var a=r[o[0]],b=r2[o[0]];
-      /* a log derivative only means something for a positive quantity; payload can go to zero or below */
+    return "<tr><td>"+SL[id].label+"</td>"+outs.map(function(o){var a=r[o[0]],b=r2[o[0]];
+      /* a log derivative only means something for a positive quantity */
       if(!(a>0&&b>0)) return '<td class="mut" title="Zero or negative, so a percent change has no meaning">–</td>';
       var x=Math.log(b/a)/Math.log(1.001),z=Math.abs(x)<0.005,cls=z?"mut":(o[2]*x>0?"good":o[2]*x<0?"badc":"");
       return '<td class="'+cls+'">'+(z?"0":sgn(x,2))+"</td>";}).join("")+"</tr>";}).join("");
 }
 
-function renderMath(r){var W=st.W,V=st.V,f=fmt,rows=[];
-  rows.push(["Stall speed","√(2W ÷ (ρ × S × CLmax)) ÷ 1.688","√(2 × "+f(W)+" ÷ (0.002377 × "+f(r.S,1)+" × "+st.CLmax.toFixed(2)+")) ÷ 1.688",r.Vs.toFixed(1)+" kt"]);
-  rows.push(["Span","√(aspect ratio × S)","√("+st.AR.toFixed(1)+" × "+f(r.S,1)+")",r.b.toFixed(1)+" ft"]);
-  rows.push(["Wing loading","W ÷ S",f(W)+" ÷ "+f(r.S,1),r.WS.toFixed(1)+" lb/ft²"]);
-  rows.push(["Dynamic pressure","½ × ρ × (V × 1.688)²","0.5 × 0.002377 × ("+f(V)+" × 1.688)²",r.q.toFixed(1)+" lb/ft²"]);
-  rows.push(["Parasite drag","q × S × CD0",r.q.toFixed(1)+" × "+f(r.S,1)+" × "+C.CD0.toFixed(3),f(r.Dp)+" lb"]);
-  rows.push(["Induced drag","W² ÷ (q × π × span² × e)",f(W)+"² ÷ ("+r.q.toFixed(1)+" × π × "+r.b.toFixed(1)+"² × "+C.e.toFixed(2)+")",f(r.Di)+" lb"]);
+function renderMath(r){var W=st.W,V=st.V,f=fmtA,rows=[],B=r.pr.B,isProp=st.prop!=="jet";
+  var g=function(t){rows.push(["__"+t]);};
+  g("Sizing");
+  rows.push(["Stall speed","√(2W ÷ (ρ × S × CLmax)) ÷ 1.688","√(2 × "+f(W)+" ÷ (0.002377 × "+f(r.S)+" × "+st.CLmax.toFixed(2)+")) ÷ 1.688",r.Vs.toFixed(1)+" kt"]);
+  rows.push(["Span","√(aspect ratio × S)","√("+st.AR.toFixed(1)+" × "+f(r.S)+")",f(r.b)+" ft"]);
+  rows.push(["Wing loading","W ÷ S",f(W)+" ÷ "+f(r.S),r.WS.toFixed(1)+" lb/ft²"]);
+  rows.push(["Dynamic pressure","½ × ρ × (V × 1.688)²","0.5 × 0.002377 × ("+fmt(V)+" × 1.688)²",r.q.toFixed(1)+" lb/ft²"]);
+  rows.push(["Parasite drag","q × S × CD0",r.q.toFixed(1)+" × "+f(r.S)+" × "+st.CD0.toFixed(3),f(r.Dp)+" lb"]);
+  rows.push(["Induced drag","W² ÷ (q × π × span² × e)",f(W)+"² ÷ ("+r.q.toFixed(1)+" × π × "+f(r.b)+"² × "+st.e.toFixed(2)+")",f(r.Di)+" lb"]);
   rows.push(["Cruise drag","parasite + induced",f(r.Dp)+" + "+f(r.Di),f(r.D)+" lb"]);
   rows.push(["Mass ratio","2(W/S) ÷ (ρ × chord × lift slope × g)","2 × "+r.WS.toFixed(1)+" ÷ (0.002377 × "+r.c.toFixed(2)+" × "+r.CLa.toFixed(2)+" × 32.2)",r.mu.toFixed(1)]);
   rows.push(["Gust alleviation","0.88μ ÷ (5.3 + μ)","0.88 × "+r.mu.toFixed(1)+" ÷ (5.3 + "+r.mu.toFixed(1)+")",r.Kg.toFixed(3)]);
-  rows.push(["Gust load factor","1 + Kg × 50 × V × lift slope ÷ (498 × W/S)","1 + "+r.Kg.toFixed(3)+" × 50 × "+f(V)+" × "+r.CLa.toFixed(2)+" ÷ (498 × "+r.WS.toFixed(1)+")",r.n.toFixed(2)+" g"]);
-  rows.push(["Empty weight",C.fe.toFixed(4)+" × W + 6 × S",C.fe.toFixed(4)+" × "+f(W)+" + 6 × "+f(r.S,1),f(r.We)+" lb"]);
-  rows.push(["Payload","W − empty weight",f(W)+" − "+f(r.We),f(r.payload)+" lb"]);
-  $("#math tbody").innerHTML=rows.map(function(x){return "<tr><td>"+x[0]+"</td><td>"+x[1]+"</td><td>"+x[2]+"</td><td>"+x[3]+"</td></tr>";}).join("");
+  rows.push(["Gust load factor","1 + Kg × 50 × V × lift slope ÷ (498 × W/S)","1 + "+r.Kg.toFixed(3)+" × 50 × "+fmt(V)+" × "+r.CLa.toFixed(2)+" ÷ (498 × "+r.WS.toFixed(1)+")",r.n.toFixed(2)+" g"]);
+  rows.push(["Empty weight","fe × W + ws × S",st.fe.toFixed(4)+" × "+f(W)+" + "+st.ws.toFixed(1)+" × "+f(r.S),f(r.We)+" lb"]);
+  rows.push(["Useful load","W − empty weight",f(W)+" − "+f(r.We),f(r.U)+" lb"]);
+  g("Altitude and fuel flow");
+  rows.push(["Density ratio",st.h<=36089?"(1 − 6.8756×10⁻⁶ × h)^4.2559":"0.29708 × e^(−(h − 36,089) ÷ 20,806)",st.h<=36089?"(1 − 6.8756×10⁻⁶ × "+fmt(st.h)+")^4.2559":"0.29708 × e^(−("+fmt(st.h)+" − 36,089) ÷ 20,806)",r.sigma.toFixed(4)]);
+  rows.push(["True airspeed","V ÷ √σ",fmt(V)+" ÷ √"+r.sigma.toFixed(4),fmt(r.VTAS,1)+" kt"]);
+  rows.push(["Drag at start of cruise","k₀ + k₂ × w², w = W × (1 − climb)",f(r.k0)+" + "+r.k2.toExponential(3)+" × "+f(r.w0)+"²",f(r.D0)+" lb"]);
+  if(isProp) rows.push(["Fuel flow","c_p × D × V_true × 1.688 ÷ (550 η)",st.cp.toFixed(2)+" × "+f(r.D0)+" × "+fmt(r.VTAS,1)+" × 1.688 ÷ (550 × "+st.eta.toFixed(2)+")",f(r.ff0)+" lb/h"]);
+  else rows.push(["Fuel flow","c_t × D",st.ct.toFixed(2)+" × "+f(r.D0),f(r.ff0)+" lb/h"]);
+  g("Range at maximum payload (point B)");
+  rows.push(["Takeoff weight","empty + payload + fuel",f(r.We)+" + "+f(B.P)+" + "+f(B.F),f(B.T)+" lb"]);
+  rows.push(["Takeoff and climb fuel","climb allowance × takeoff weight",(st.fc*100).toFixed(1)+"% × "+f(B.T),f(B.Fc)+" lb"]);
+  rows.push(["Reserve fuel","(reserve min ÷ 60) × fuel flow at landing weight","("+st.tr+" ÷ 60) × fuel flow at "+f(B.w2),f(B.Fr)+" lb"]);
+  rows.push(["Cruise fuel","fuel − climb − reserve",f(B.F)+" − "+f(B.Fc)+" − "+f(B.Fr),f(B.Fcr)+" lb"]);
+  rows.push(["Range",(isProp?"(550η ÷ (1.688 c_p))":"(V_true ÷ c_t)")+" × ∫ dw ÷ D(w)",B.Fcr>0?(f(r.Krange)+" × ∫ from "+f(B.w2)+" to "+f(B.w1)):"no cruise fuel",fmt(B.R)+" nmi"]);
+  $("#math tbody").innerHTML=rows.map(function(x){return x[0].indexOf("__")===0?'<tr class="grp"><td colspan="4">'+x[0].slice(2)+"</td></tr>":"<tr><td>"+x[0]+"</td><td>"+x[1]+"</td><td>"+x[2]+"</td><td>"+x[3]+"</td></tr>";}).join("");
 }
 function renderNotes(){
-  $("#modeNote").textContent="Drag any handle or slider, or type a value and press Enter. Wing area, weight, speed, lift coefficient and aspect ratio change directly. Stall speed resizes the wing. Payload changes the gross weight. Cruise drag and gust load factor change the cruise speed.";
+  var P=PRESETS[curPreset];
+  $("#subline").textContent="Starts at the "+P.name+". Move one quantity and see how the physics moves the others. The dashed ring is the reference"+(REF.name!==P.name?": "+REF.name:"")+".";
+  $("#modeNote").textContent="Drag any handle or slider, or type a value and press Enter. Stall speed resizes the wing. Useful load changes the gross weight. Cruise drag and gust load factor change the cruise speed. Range is a result only.";
   $("#notes").innerHTML=
    "<p><b>The core link.</b> Stall speed, weight, wing area and maximum lift coefficient are tied by one equation. Set three and the fourth follows. Stall speed goes with the square root of wing loading.</p>"+
    "<p><b>Drag.</b> Parasite drag goes with speed squared and wing area. Induced drag goes with weight squared and falls with speed squared and span squared. Their sum is lowest where the two are equal.</p>"+
-   "<p><b>Gusts.</b> The gust load factor rises with speed and falls with wing loading. A large wing that gives a slow stall also gives a rough ride at high speed.</p>"+
-   "<p><b>Starting point: stock Skyvan Series 3, powered.</b> 12,500 lb maximum takeoff weight. Wing 373 ft², aspect ratio 11.3. Maximum lift coefficient 2.75 with landing flap and power, which gives the published 60 kt stall. Cruise 127 kt, the sea-level equivalent of 148 kt true at 10,000 ft. Empty weight 7,344 lb at the start (Jane's basic empty weight).</p><p><b>Assumptions.</b> Sea level. Zero-lift drag coefficient 0.040 from the earlier Skyvan drag build-up (struts, fixed gear, upswept tail; nacelles and propellers not included, so drag reads a little low). Span efficiency 0.72 (Raymer). Gust velocity 50 ft/s. Empty weight is 40.85% of gross weight plus 6 lb for each square foot of wing, set so it matches 7,344 lb at the start. Stall speed uses the powered maximum lift coefficient; slipstream and thrust effects are inside that one number.</p>";
+   "<p><b>Range.</b> Range comes from the fuel burned in cruise divided by drag, integrated as the aircraft gets lighter. Propeller range depends on propeller efficiency over brake specific fuel consumption; jet range also grows with true airspeed, which is why jets cruise high.</p>"+
+   "<p><b>Starting point: "+P.name+".</b> "+P.note+"</p>"+
+   "<p><b>Assumptions.</b> Speeds that set drag are equivalent airspeed. No compressibility, so jet results are rough. The gust load factor uses the FAR 23 formula with sea-level density and a 50 ft/s gust. Empty weight follows a two-term rule fitted to one point per aircraft, so it gives trends, not predictions. Range is flown at constant altitude and equivalent airspeed with no climb or descent distance; crew counts as payload. The radar is a log scale from 25% to 400% of the reference.</p>";
 }
-function render(){var r=evaluate(st); window.__last=r; renderRadar(r);renderSliders(r);renderTiles(r);renderCurve(r);renderMap(r);renderSens(r);renderMath(r);}
+function render(){var r=evaluate(st); window.__last=r; renderNotes(); renderRadar(r);renderSliders(r);renderTiles(r);renderPR(r);renderCurve(r);renderMap(r);renderSens(r);renderMath(r);}
 $("#btnReset").addEventListener("click",reset);
-$("#btnPin").addEventListener("click",function(){var r=evaluate(st);pinned={V:st.V,W:st.W,payload:r.payload,D:r.D,n:r.n,S:r.S,Vs:r.Vs};render();});
+$("#btnRef").addEventListener("click",function(){setRef(st,"your aircraft"); pinned=null; render();});
+$("#btnPin").addEventListener("click",function(){var r=evaluate(st),p={};AX.forEach(function(a){p[a.id]=a.get(r);});pinned=p;render();});
+$("#preset").addEventListener("change",function(){loadPreset($("#preset").value);});
 document.getElementById('map').addEventListener('click',function(){if(selNode){selNode=null;renderMap(window.__last);}});
-window.__app={get st(){return st;},setInput:setInput};
-buildRadar();buildSliders();buildMap();renderNotes();
+window.__app={get st(){return st;},setInput:setInput,loadPreset:loadPreset,get ref(){return REF;},model:model};
+$("#preset").innerHTML=PRESET_ORDER.map(function(id){return '<option value="'+id+'">'+PRESETS[id].name+'</option>';}).join("");
+buildRadar();buildSliders();buildMap();
 reset();
 })();
 </script>
