@@ -263,6 +263,38 @@ const tests = {
     });
     return { pass: res.length === 0, detail: `400 random aircraft, ${res.length} problems` + (res.length ? ': ' + res.slice(0, 3).join('; ') : '') };
   },
+  // Reviewer finding 1: stepping a number box with the arrow keys, then Enter, shows the stored (rounded) value.
+  async numberBoxShowsStoredValueAfterStepping(page) {
+    await page.evaluate(() => window.__app.loadPreset('c172'));
+    await page.focus('#n_h'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter');
+    const s = await state(page), box = await page.inputValue('#n_h');
+    return { pass: s.st.h === 8500 && box === '8500', detail: `altitude stored ${s.st.h}, box shows ${box} (want 8500 for both)` };
+  },
+  // Reviewer finding 2: number-box arrows step by the control's step, not by 1.
+  async numberBoxSmallSteps(page) {
+    const out = [];
+    for (const [id, want] of [['CD0', 0.039], ['e', 0.71], ['cp', 0.59], ['eta', 0.79], ['CLmax', 2.70]]) {
+      await page.evaluate(() => { document.getElementById('btnReset').click(); document.getElementById('constBox').open = true; }); // constants live in a collapsible block
+      await page.focus('#n_' + id); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+      const v = (await state(page)).st[id]; out.push(`${id} ${v}`);
+      if (Math.abs(v - want) > 1e-9) return { pass: false, detail: `${id}: ArrowDown gave ${v}, want ${want}` };
+    }
+    return { pass: true, detail: 'ArrowDown: ' + out.join(', ') };
+  },
+  // Reviewer finding 3: log sliders report the real value to screen readers.
+  async logSlidersHaveValueText(page) {
+    const t = await page.evaluate(() => ['W', 'S', 'We', 'Fmax', 'Pmax'].map(id => document.getElementById('s_' + id).getAttribute('aria-valuetext')));
+    return { pass: t.join('|') === '12500 lb|373 ft²|7344 lb|2262 lb|4600 lb', detail: t.join(', ') };
+  },
+  // Reviewer finding 5: changing preset while a number box holds unapplied text discards that text.
+  async presetChangeDiscardsTyping(page) {
+    await page.click('#n_W', { clickCount: 3 }); await page.keyboard.type('9999');
+    await page.evaluate(() => window.__app.loadPreset('c172'));    // focus stays in the box
+    const mid = await page.inputValue('#n_W');
+    await page.keyboard.press('Tab');                                 // blur: must not apply stale text
+    const s = await state(page), box = await page.inputValue('#n_W');
+    return { pass: mid === '2550' && s.st.W === 2550 && box === '2550', detail: `box after preset change ${mid}; after blur W ${s.st.W}, box ${box}` };
+  },
   // Random walks over the full new ranges never put NaN on screen or throw.
   async noNaNAnywhere(page) {
     const res = await page.evaluate(() => {

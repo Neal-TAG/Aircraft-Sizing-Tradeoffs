@@ -286,7 +286,8 @@ var curPreset="skyvan", REF, base0;
 var st,pinned=null,touched="W",selNode=null;
 function copyInputs(o){var r={};["W","V","S","CLmax","AR","CD0","e","fe","ws","h","prop","cp","eta","ct","Fmax","Pmax","tr","fc"].forEach(function(k){r[k]=o[k];});return r;}
 function setRef(o,name){REF=copyInputs(o); REF.name=name; base0=model(REF);}
-function reset(){st=copyInputs(PRESETS[curPreset]); setRef(st,PRESETS[curPreset].name); pinned=null; touched="W"; selNode=null; render();}
+function reset(){Object.keys(sEls).forEach(function(id){sEls[id].typing=false;}); /* a preset change or Reset discards unapplied typing */
+  st=copyInputs(PRESETS[curPreset]); setRef(st,PRESETS[curPreset].name); pinned=null; touched="W"; selNode=null; render();}
 function loadPreset(id){curPreset=id; var s=document.getElementById("preset"); if(s.value!==id) s.value=id; reset();}
 
 /* radar: log scale, 25% at the centre to 400% at the rim */
@@ -379,7 +380,7 @@ var SL={
  V:{label:"Cruise speed, equivalent",unit:"kt",dec:0,hint:"Equivalent airspeed. True airspeed follows from the altitude."},
  CLmax:{label:"Maximum lift coefficient",unit:"",dec:2,hint:"Landing configuration. Changes the stall speed."},
  AR:{label:"Aspect ratio",unit:"",dec:1,hint:"Span squared divided by wing area. Slender wings have a high value."},
- h:{label:"Cruise altitude",unit:"ft",dec:0,hint:"Sets the true airspeed and so the range. Drag at a given equivalent airspeed doesn't change."},
+ h:{label:"Cruise altitude",unit:"ft",dec:0,hint:"Sets the true airspeed. Drag at a given equivalent airspeed doesn't change. Jet range grows with altitude. Propeller cruise range doesn't, and the timed reserve burns more fuel at the higher true airspeed."},
  CD0:{label:"Zero-lift drag coefficient",unit:"",dec:3},
  e:{label:"Span efficiency",unit:"",dec:2},
  We:{label:"Empty weight",unit:"lb",auto:true,hint:"Setting this changes the fixed part of the empty-weight rule."},
@@ -403,19 +404,24 @@ function buildSliders(){sEls={};
   GROUPS[g].forEach(function(id){var c=SL[id],R=RANGE[id],sc=c.scale||1,d=document.createElement("div"); d.className="row";
     var l=document.createElement("label"); l.htmlFor="s_"+id; l.textContent=c.label;
     var v=document.createElement("span"); v.className="v"; d.appendChild(l); d.appendChild(v);
-    var num=document.createElement("input"); num.type="number"; num.id="n_"+id; num.min=R.min*sc; num.max=R.max*sc; num.step="any"; num.setAttribute("aria-label",c.label+" value"); num.inputMode="decimal";
+    var num=document.createElement("input"); num.type="number"; num.id="n_"+id; num.min=R.min*sc; num.max=R.max*sc;
+    /* spinner and arrow keys step by the control's own step; log controls accept any value */
+    num.step=R.log?"any":String(+(R.step*sc).toPrecision(6)); num.setAttribute("aria-label",c.label+" value"); num.inputMode="decimal";
     var unit=document.createElement("span"); unit.className="u"; unit.textContent=c.unit; v.appendChild(num); v.appendChild(unit);
-    num.addEventListener("change",function(){var x=parseFloat(num.value); if(isFinite(x)) setInput(id,x/sc); else render();});
-    num.addEventListener("keydown",function(ev){if(ev.key==="Enter"){num.blur();} else if(ev.key==="Escape"){num.value=showVal(id,curVal(id,evaluate(st))); num.blur();}});
+    /* "typing" is true only while the box holds text the user hasn't applied; otherwise the box always shows the model value */
+    num.addEventListener("input",function(){sEls[id].typing=true;});
+    num.addEventListener("change",function(){sEls[id].typing=false; var x=parseFloat(num.value); if(isFinite(x)) setInput(id,x/sc); else render();});
+    num.addEventListener("keydown",function(ev){if(ev.key==="Enter"){num.blur();} else if(ev.key==="Escape"){sEls[id].typing=false; num.value=showVal(id,curVal(id,evaluate(st))); num.blur();}});
     var inp=document.createElement("input"); inp.type="range"; inp.id="s_"+id;
     if(R.log){inp.min=0;inp.max=1000;inp.step=1;} else {inp.min=R.min;inp.max=R.max;inp.step=R.step;}
     inp.addEventListener("input",function(){setInput(id,fromPos(id,+inp.value));}); d.appendChild(inp);
     if(c.hint){var h=document.createElement("span"); h.className="hint"; h.textContent=c.hint; d.appendChild(h);}
-    box.appendChild(d); sEls[id]={row:d,num:num,inp:inp};});});
+    box.appendChild(d); sEls[id]={row:d,num:num,inp:inp,typing:false};});});
 }
-function renderSliders(r){Object.keys(sEls).forEach(function(id){var e=sEls[id],val=curVal(id,r),c=SL[id];
+function renderSliders(r){Object.keys(sEls).forEach(function(id){var e=sEls[id],val=curVal(id,r),c=SL[id],shown=showVal(id,val);
   e.row.hidden=(c.prop&&st.prop==="jet")||(c.jet&&st.prop!=="jet");
-  if(document.activeElement!==e.num) e.num.value=showVal(id,val); if(document.activeElement!==e.inp) e.inp.value=toPos(id,val);});
+  if(!e.typing) e.num.value=shown; if(document.activeElement!==e.inp) e.inp.value=toPos(id,val);
+  e.inp.setAttribute("aria-valuetext",shown+(c.unit?" "+c.unit:""));});
   $("#bProp").setAttribute("aria-pressed",st.prop!=="jet"); $("#bJet").setAttribute("aria-pressed",st.prop==="jet");}
 $("#bProp").addEventListener("click",function(){st.prop="prop"; touched="W"; render();});
 $("#bJet").addEventListener("click",function(){st.prop="jet"; touched="W"; render();});
