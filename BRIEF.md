@@ -194,6 +194,7 @@ The map doesn't yet show altitude, fuel or range.
 - The design-point panel is radar and spec sheet (1.45 : 1). The payload-range panel is chart and readouts (1.7 : 1). Both stack below 1,180 px.
 - The rail narrows to 330 px below 1,180 px.
 - Below 900 px the page is one column, ordered as header, strip, design point, then the rail, then the rest. Nothing is sticky, the strip shows six readouts in three columns, and the radar labels grow so they stay readable.
+- Logo: the Tamarack wordmark, embedded once as a transparent PNG `data:` URL in the `--logo` token and drawn as a CSS mask, so it takes the text colour. It is white at the top of the rail, and navy above the title below 900 px, where the rail's brand block hides.
 - Tab icon: an inline SVG `data:` URL showing a white radar shape on the accent green.
 - Theme follows the system; `data-theme` on `<html>` overrides it. The colour tokens are:
   - bg, panel, ink, muted, line, grid, accent, accent-soft, accent-fill, pin, pin-fill, good, bad, warn (REVE moved these to a cool slate palette);
