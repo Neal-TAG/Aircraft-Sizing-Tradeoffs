@@ -89,11 +89,12 @@ Sanity check: 1,115 lb at 148 kt true is about 506 thrust hp, roughly 630 shp at
 
 ## Page layout
 
-1. **Header:** title, one-line description, "Pin this point" and "Reset" buttons.
+1. **Control rail (left, dark, sticky):** the Tamarack logo, the flight phase switch (Flaps down / Clean, each half showing its stall speed), "Pin this point" and "Reset", the how-to note, then the six input sliders. Below 900 px wide the page is one column: title, radar and design point, the rail, then the rest. Nothing is sticky there.
+   **Header (main area):** title and one-line description.
 2. **Radar chart (left):** seven axes, each shown as a percentage of the stock Skyvan from 40% (centre) to 160% (rim). The dashed ring is the stock Skyvan, the filled shape is the current point, and a dotted outline shows a pinned point. Labels show value and % change; green means better, red means worse, and weight and speed stay neutral.
    - Axes in order: cruise speed, gross weight, payload, cruise drag, gust load factor, wing area, stall speed.
-3. **Controls (right):** a slider plus a typed number box for each input (stall speed, wing area, gross weight, cruise speed, max lift coefficient, aspect ratio). Six tiles show wing loading, span, empty weight, cruise L/D, best L/D and minimum drag speed, each with % change.
-4. **Drag against speed:** parasite, induced and total drag curves from the stall speed to 260 kt. Shows the stall line, minimum drag point, cruise point, and the stock total drag curve dashed for comparison.
+3. **Design point (right of the radar):** a slider plus a typed number box for each input (stall speed, wing area, gross weight, cruise speed, max lift coefficient, aspect ratio). Six tiles show wing loading, span, empty weight, cruise L/D, best L/D and minimum drag speed, each with % change.
+4. **Drag against speed:** parasite, induced and total drag curves from the stall speed to 260 kt. Shows the stall line, minimum drag point, cruise point, and the stock total drag curve dashed for comparison. Both stall speeds are drawn: the selected phase as a strong line with its label across the top, the other phase as a faint line with its label set vertically beside it.
 5. **How the quantities connect:** a dependency map (see below).
 6. **Influence table:** % change in each result for a 1% increase in each input at the current point (log derivative from a 0.1% step). For example, +0.50 means a square-root dependence and −2.00 an inverse square.
 7. **The math, with your numbers:** a four-column table (quantity, formula, with numbers, result), live.
@@ -239,9 +240,9 @@ Five paragraphs, laid out in columns of at least 280 px:
 
 - `window.__app` exposes `st` and `setInput` for the headless tests.
 
-## Flight phase switch (added after REVB)
+## Flight phase switch and restyle (added after REVB)
 
-Added at a co-worker's request: a flapped (dirty) stall and a clean stall from the same wing. Lift only; no flap or gear drag. `tests/ui.test.js` checks it (`flightPhase`), and the regression pass against the previous page shows no differences in Flaps down.
+Added at a co-worker's request: a flapped (dirty) stall and a clean stall from the same wing. Lift only; no flap or gear drag. The page was also restyled with the dark control rail and Tamarack logo from the REVE work (on the `reve` branch), without REVE's payload-range model. Screenshots are in `docs/screenshots/` (before-*, after-*). `tests/ui.test.js` checks it (`flightPhase`), and the regression pass against the previous page shows no differences in Flaps down.
 
 ## Changes in REVB (from REVA)
 

@@ -149,12 +149,15 @@ const tests = {
   // Flight phase: Clean swaps in the clean lift coefficient for the stall and nothing else; Flaps down swaps back.
   async flightPhase(page) {
     const bad = [];
-    const note = () => page.textContent('#phaseNote');
+    const note = async () => `${await page.textContent('#vsF')} flaps down, ${await page.textContent('#vsC')} clean`;
+    const altLine = () => page.evaluate(() => { const l = document.querySelector('#curve line.vs.alt'), t = document.querySelector('#curve text.alt'); return l && t ? t.textContent : null; });
     const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) bad.push(`${what} ${a.toFixed(2)} (want ${b.toFixed(2)})`); };
     const a = await state(page);
     if (!(await note()).includes('60.0 kt flaps down, 81.2 kt clean')) bad.push('start note: ' + await note());
+    if ((await altLine()) !== 'Clean stall 81.2 kt') bad.push('faint stall line (flaps down) reads ' + await altLine());
     await page.click('#phClean');
     const b = await state(page);
+    if ((await altLine()) !== 'Flaps-down stall 60.0 kt') bad.push('faint stall line (clean) reads ' + await altLine());
     near(b.r.Vs, 60.0 * Math.sqrt(2.75 / 1.5), 0.05, 'clean stall');
     for (const k of ['D', 'n', 'payload', 'S', 'WS']) near(b.r[k], a.r[k], 1e-9, k + ' changed with phase:');
     if ((await page.inputValue('#n_CLmax')) !== '1.50') bad.push('lift box shows ' + await page.inputValue('#n_CLmax'));
@@ -206,7 +209,7 @@ async function regression(browser, ref, cur) {
     const s = window.__app.st;
     return { r, st: { W: s.W, V: s.V, S: s.S, CLmax: s.CLmax, AR: s.AR },
       tiles: document.querySelector('#tiles').innerHTML, radar: [...document.querySelectorAll('#radar text')].map(t => t.textContent + '|' + t.style.fill).join(';'),
-      shape: document.querySelector('#radar .shape').getAttribute('points'), curve: document.querySelector('#curve').innerHTML,
+      shape: document.querySelector('#radar .shape').getAttribute('points'), curve: (() => { const c = document.querySelector('#curve').cloneNode(true); c.querySelectorAll('.alt').forEach(e => e.remove()); return c.innerHTML.replace('Flaps-down stall ', 'Stall '); })(),
       map: [...document.querySelectorAll('#map text, #map .hot')].map(e => e.textContent || e.getAttribute('class')).join(';'),
       sens: document.querySelector('#sens').innerHTML, math: document.querySelector('#math tbody').innerHTML };
   });
