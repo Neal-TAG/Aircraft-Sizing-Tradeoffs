@@ -260,7 +260,8 @@ const tests = {
         const r = model(window.__app.st), p = r.pr;
         const pts = [p.A, p.B, p.C, p.D];
         if (pts.some(x => x.P < -1e-9 || x.F < -1e-9 || x.R < 0 || !isFinite(x.R))) bad.push('negative or non-finite at ' + i);
-        if (!(p.B.R <= p.C.R + 1e-9 && p.C.R <= p.D.R + 1e-9)) bad.push(`range order ${p.B.R.toFixed(1)}, ${p.C.R.toFixed(1)}, ${p.D.R.toFixed(1)} at ${i}`);
+        // B ≤ C always; C ≤ D except for the documented glide quirk, which can never be bigger than the descent-distance difference
+        if (!(p.B.R <= p.C.R + 1e-9 && p.C.R <= p.D.R + Math.max(0, p.C.Xd - p.D.Xd) + 1e-9)) bad.push(`range order ${p.B.R.toFixed(1)}, ${p.C.R.toFixed(1)}, ${p.D.R.toFixed(1)} at ${i}`);
         if (!(p.A.P >= p.B.P - 1e-9 && p.B.P >= p.C.P - 1e-9 && p.C.P >= p.D.P - 1e-9)) bad.push('payload order at ' + i);
         if (r.U > 0 && pts.some(x => x.T > window.__app.st.W + 1e-6)) bad.push('over max takeoff weight at ' + i);
         if (r.U > 0 && pts.some(x => x.P > 0 && x.w2 > window.__app.st.WL + 0.05)) bad.push('lands above max landing weight at ' + i);
@@ -323,8 +324,9 @@ const tests = {
       await page.evaluate(id => window.__app.loadPreset(id), id);
       const a = await state(page);
       await page.click('#btnBest');
-      const b = await state(page), disabled = await page.$eval('#btnBest', x => x.disabled);
-      out.push({ id, V: `${a.st.V}→${b.st.V}`, ferry: `${a.r.RD.toFixed(0)}→${b.r.RD.toFixed(0)}`, ok: b.st.V === Math.round(a.r.Vbest) && disabled && b.r.RD >= a.r.RD - 1e-6 });
+      const b = await state(page), btn = await page.$eval('#btnBest', x => ({ ariaOff: x.getAttribute('aria-disabled') === 'true', focused: document.activeElement === x, enabled: !x.disabled }));
+      // review finding: the button must keep keyboard focus after use (aria-disabled, not disabled)
+      out.push({ id, V: `${a.st.V}→${b.st.V}`, ferry: `${a.r.RD.toFixed(0)}→${b.r.RD.toFixed(0)}`, ok: b.st.V === Math.round(a.r.Vbest) && btn.ariaOff && btn.focused && btn.enabled && b.r.RD >= a.r.RD - 1e-6 });
     }
     return { pass: out.every(x => x.ok), detail: out.map(x => `${x.id} V ${x.V} kt, ferry ${x.ferry} nmi`).join('; ') };
   },
@@ -347,6 +349,22 @@ const tests = {
     const landed = ['A', 'B', 'C'].map(k => s.r.pr[k].w2);
     const ok = s.r.Pstar < s.st.Pmax && Math.abs(s.r.pr.B.P - s.r.Pstar) < 1e-6 && landed.every(w => w <= 44000 + 0.05) && warn.includes('landing weight') && Math.abs(landed[0] - 44000) < 0.05;
     return { pass: ok, detail: `payload capped ${s.st.Pmax} → ${s.r.Pstar.toFixed(0)} lb; landing weights A/B/C ${landed.map(w => w.toFixed(1)).join(', ')} lb; warning ${warn.includes('landing weight')}` };
+  },
+  // Review finding: with no speed between stall and 500 kt, there is no best-range speed and the button does nothing.
+  async noBestRangeSpeed(page) {
+    await set(page, [['W', 1300000], ['S', 30]]);
+    const a = await state(page), text = await page.textContent('#btnBest');
+    await page.click('#btnBest', { force: true }); // Playwright skips aria-disabled buttons; force it to prove the click is a no-op
+    const b = await state(page), body = await page.evaluate(() => document.body.innerText);
+    const ok = a.r.Vbest === null && text.includes('No best-range speed') && b.st.V === a.st.V && !/NaN|Infinity|undefined/.test(body);
+    return { pass: ok, detail: `stall ${a.r.Vs.toFixed(0)} kt; Vbest ${a.r.Vbest}; button "${text}"; V after click ${b.st.V} (was ${a.st.V})` };
+  },
+  // Review findings: stock presets show no false alarms; the landing-weight cap reads as a note.
+  async presetWarningsAreFair(page) {
+    const res = await page.evaluate(() => Object.keys(PRESETS).map(id => { window.__app.loadPreset(id); return [id, document.getElementById('prWarn').textContent]; }));
+    const div = res.filter(([, w]) => w.includes('drag divergence')), c172 = res.find(([id]) => id === 'c172')[1];
+    const ok = div.length === 0 && /lands at or under its maximum landing weight/.test(c172) && !/limited to/.test(c172);
+    return { pass: ok, detail: res.map(([id, w]) => `${id}: ${w ? '"' + w.slice(0, 60) + '…"' : 'none'}`).join('; ') };
   },
   // Climb and descent: no segments at sea level or with zero climb rate; more climb rate means less climb fuel for a given altitude.
   async climbDescentSegments(page) {

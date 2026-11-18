@@ -119,6 +119,9 @@ The EAS that maximises specific range (nmi per lb of fuel) in cruise at weight w
 - Prop: maximise 1 ÷ D(V). Jet: maximise V_TAS(V) ÷ D(V).
 - Here D(V) = q(V)·S·(CD0 + ΔCD(V)) + w_b²·k₂(V), with q, k₂ and ΔCD evaluated at that V.
 - Search V from max(40, 1.1·Vs) to 500 kt. Use a 400-step grid, then refine with a golden-section search to 0.01 kt.
+- If the search interval is empty (1.1·Vs ≥ 500 kt), there is no best-range speed, and the page shows none.
+- The page warns when cruise Mach is more than 0.02 past drag divergence. In Lock's law, drag divergence (dCD/dM = 0.1) is at M_crit + 0.108.
+- Known quirk: the descent glide ratio grows with landing weight at a fixed speed, so point D's range can be a little below C's. The difference is never more than the difference in their descent distances.
 
 Without compressibility this gives the minimum drag speed for a prop and 3^¼ ≈ 1.316 times the minimum drag speed for a jet. Those are the textbook results and a useful check.
 
