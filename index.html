@@ -126,6 +126,11 @@ svg.chart .vs{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
 svg.chart .cr{fill:var(--panel);stroke:var(--accent);stroke-width:3} svg.chart .md{fill:var(--accent)}
 svg.chart .prfill{fill:var(--accent-soft);stroke:none}
 .legend i.c1{border-top-color:var(--warn)} .legend i.c2{border-top-color:var(--pin)}
+svg.chart .c3{stroke:var(--bad);stroke-dasharray:6 3} .legend i.c3{border-top:2px dashed var(--bad)}
+svg.chart .bestmk{fill:var(--pin);stroke:var(--panel);stroke-width:1.5}
+.legend i.bm{width:10px;height:10px;border:0;background:var(--pin);transform:rotate(45deg)}
+.legend span[hidden]{display:none}
+.btn:disabled{opacity:.6;cursor:default}
 </style>
 </head>
 <body>
@@ -174,6 +179,7 @@ svg.chart .prfill{fill:var(--accent-soft);stroke:none}
       <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Reference</span></div>
       <p class="warnline" id="prWarn" aria-live="polite"></p>
       <div class="tiles" id="prTiles" style="margin-top:8px"></div>
+      <p style="margin-top:10px"><button type="button" class="btn" id="btnBest">Fly at best-range speed</button> <span class="sub" id="bestNote"></span></p>
     </div>
   </div>
 </section>
@@ -182,7 +188,7 @@ svg.chart .prfill{fill:var(--accent-soft);stroke:none}
   <h2>Drag against speed</h2>
   <p class="sub">Parasite drag rises with speed squared. Induced drag falls with speed squared. Weight lifts the induced curve; wing area lifts the parasite curve and moves the stall line. Speeds are equivalent airspeed, so the curves don't move with altitude. Both axes scale to the current aircraft.</p>
   <svg id="curve" class="chart" viewBox="0 0 900 330" role="img" aria-label="Drag against speed with stall speed and cruise speed marked"></svg>
-  <div class="legend"><span><i></i>Total drag</span><span><i class="c1"></i>Parasite</span><span><i class="c2"></i>Induced</span><span><i class="b"></i>Total, reference</span></div>
+  <div class="legend"><span><i></i>Total drag</span><span><i class="c1"></i>Parasite</span><span><i class="c2"></i>Induced</span><span id="lgDc"><i class="c3"></i>Compressibility</span><span><i class="b"></i>Total, reference</span><span><i class="bm"></i>Best-range speed</span></div>
 </section>
 
 <section class="panel">
@@ -211,29 +217,36 @@ var KT=1.688, RHO=0.002377, G0=32.2, UDE=50;
 /* Presets. Every field is an input to model(). fe is set so the empty-weight rule We = fe·W + ws·S gives the listed empty weight. */
 /* Sources and estimates for each preset are listed in docs/presets.md. */
 var PRESETS={
- skyvan:{name:"Short SC.7 Skyvan Series 3",W:12500,V:127,S:373,CLmax:2.75,AR:11.3,CD0:0.040,e:0.72,fe:0.4085,ws:6,h:10000,prop:"prop",cp:0.60,eta:0.80,ct:0.60,Fmax:2262,Pmax:4600,tr:45,fc:0.02,
+ skyvan:{name:"Short SC.7 Skyvan Series 3",W:12500,V:127,S:373,CLmax:2.75,AR:11.3,CD0:0.040,e:0.72,fe:0.4085,ws:6,h:10000,prop:"prop",cp:0.60,eta:0.80,ct:0.60,Fmax:2262,Pmax:4600,WL:12500,tr:45,ft:0.008,roc:1150,Mcrit:0.65,
   note:"12,500 lb maximum takeoff weight. Wing 373 ft², aspect ratio 11.3. Maximum lift coefficient 2.75 with landing flap and power, which gives the published 60 kt stall. Cruise 127 kt equivalent, which is 148 kt true at 10,000 ft. Empty weight 7,344 lb (Jane's basic empty weight). 2,262 lb usable fuel and 4,600 lb maximum cabin payload (EASA type certificate). Fuel consumption 0.60 lb/shp/h is an estimate."},
- c172:{name:"Cessna 172S Skyhawk",W:2550,V:108,S:174,CLmax:1.90,AR:7.5,CD0:0.032,e:0.75,fe:0.4816,ws:2.5,h:8000,prop:"prop",cp:0.46,eta:0.78,ct:0.60,Fmax:318,Pmax:895,tr:45,fc:0.01,
+ c172:{name:"Cessna 172S Skyhawk",W:2550,V:108,S:174,CLmax:1.90,AR:7.5,CD0:0.032,e:0.75,fe:0.4816,ws:2.5,h:8000,prop:"prop",cp:0.46,eta:0.78,ct:0.60,Fmax:318,Pmax:895,WL:2550,tr:45,ft:0.0033,roc:571,Mcrit:0.70,
   note:"2,550 lb maximum takeoff weight, 174 ft² wing, 36.1 ft span, 1,663 lb standard empty weight, 48 kt flaps-down stall, 122 kt true at 8,000 ft, 53 gal (318 lb) usable fuel and 895 lb maximum useful load, all from the pilot's operating handbook. Fuel consumption 0.46 lb/hp/h is backed out of the handbook's cruise table. Drag constants are estimates."},
- kingair350:{name:"Beechcraft King Air 350",W:15000,V:174,S:300,CLmax:2.25,AR:11.2,CD0:0.027,e:0.80,fe:0.5837,ws:4,h:35000,prop:"prop",cp:0.58,eta:0.82,ct:0.60,Fmax:3611,Pmax:2545,tr:45,fc:0.025,
+ kingair350:{name:"Beechcraft King Air 350",W:15000,V:174,S:300,CLmax:2.25,AR:11.2,CD0:0.027,e:0.80,fe:0.5837,ws:4,h:35000,prop:"prop",cp:0.58,eta:0.82,ct:0.60,Fmax:3611,Pmax:2545,WL:15000,tr:45,ft:0.0067,roc:1200,Mcrit:0.70,
   note:"15,000 lb maximum takeoff weight, 300 ft² wing and 57.9 ft span (EASA type certificate). 9,955 lb basic operating weight and 539 gal (3,611 lb) usable fuel (Textron). Maximum payload 2,545 lb assumes a 12,500 lb zero-fuel weight. 312 kt true at 35,000 ft. The 81 kt stall has no published weight or flap setting. Fuel consumption and drag constants are estimates."},
- atr72:{name:"ATR 72-600",W:50705,V:197,S:657,CLmax:2.60,AR:12.0,CD0:0.026,e:0.80,fe:0.5201,ws:6,h:20000,prop:"prop",cp:0.46,eta:0.82,ct:0.60,Fmax:11024,Pmax:15982,tr:45,fc:0.02,
-  note:"23,000 kg (50,705 lb) maximum takeoff weight, 657 ft² wing, 88.75 ft span, 30,314 lb typical operating empty weight, 46,296 lb maximum zero-fuel weight and 5,000 kg usable fuel (ATR). 270 kt true at 20,000 ft. Stall speed is estimated from the published approach speed. Fuel consumption is backed out of ATR's cruise fuel flow. Drag constants are estimates."},
- b737:{name:"Boeing 737-800",W:174200,V:250,S:1341,CLmax:2.60,AR:9.5,CD0:0.021,e:0.85,fe:0.4625,ws:8,h:35000,prop:"jet",cp:0.50,eta:0.80,ct:0.60,Fmax:46062,Pmax:47000,tr:45,fc:0.025,
-  note:"174,200 lb maximum takeoff weight, 91,300 lb operating empty weight, 138,300 lb maximum zero-fuel weight and 46,062 lb usable fuel (Boeing airport planning document). 1,341 ft² wing, aspect ratio from the 112.6 ft span without winglets, with winglets counted in the span efficiency. About 450 kt true at 35,000 ft. Stall speed, fuel consumption and drag constants are estimates. No compressibility drag is modelled."}
+ atr72:{name:"ATR 72-600",W:50705,V:197,S:657,CLmax:2.60,AR:12.0,CD0:0.026,e:0.80,fe:0.5201,ws:6,h:20000,prop:"prop",cp:0.46,eta:0.82,ct:0.60,Fmax:11024,Pmax:15982,WL:49272,tr:45,ft:0.0035,roc:880,Mcrit:0.68,
+  note:"23,000 kg (50,705 lb) maximum takeoff weight, 49,272 lb maximum landing weight, 657 ft² wing, 88.75 ft span, 30,314 lb typical operating empty weight, 46,296 lb maximum zero-fuel weight and 5,000 kg usable fuel (ATR). 270 kt true at 20,000 ft. Stall speed is estimated from the published approach speed. Fuel consumption is backed out of ATR's cruise fuel flow. Drag constants are estimates."},
+ b737:{name:"Boeing 737-800",W:174200,V:250,S:1341,CLmax:2.60,AR:9.5,CD0:0.021,e:0.85,fe:0.4625,ws:8,h:35000,prop:"jet",cp:0.50,eta:0.80,ct:0.60,Fmax:46062,Pmax:47000,WL:146300,tr:45,ft:0.0025,roc:1500,Mcrit:0.67,
+  note:"174,200 lb maximum takeoff weight, 146,300 lb maximum landing weight, 91,300 lb operating empty weight, 138,300 lb maximum zero-fuel weight and 46,062 lb usable fuel (Boeing airport planning document). 1,341 ft² wing, aspect ratio from the 112.6 ft span without winglets, with winglets counted in the span efficiency. About 450 kt true (Mach 0.78) at 35,000 ft. Stall speed, fuel consumption, drag constants and critical Mach number are estimates."}
 };
 var PRESET_ORDER=["skyvan","c172","kingair350","atr72","b737"];
+var A0=661.48, NMFT=6076.12, IDLE=0.10;
 function cla(A){return 2*Math.PI*A/(2+Math.sqrt(4+A*A/0.9025));}
 function sizeWing(W,Vs,CLmax){return 2*W/(RHO*Math.pow(Vs*KT,2)*CLmax);}
 function sigmaAt(h){return h<=36089?Math.pow(1-6.8756e-6*h,4.2559):0.29708*Math.exp(-(h-36089)/20806);}
+function thetaAt(h){return h<=36089?1-6.8756e-6*h:0.751863;}
+/* Lock's fourth-power law for compressibility drag */
+function dCDat(M,Mcrit){return M>Mcrit?20*Math.pow(M-Mcrit,4):0;}
 function drag(W,V,S,AR,CD0,e){var q=0.5*RHO*Math.pow(V*KT,2),Dp=q*S*CD0,Di=W*W/(q*Math.PI*AR*S*e);return {q:q,Dp:Dp,Di:Di,D:Dp+Di};}
-/* One mission: payload P and fuel F (see docs/payload-range-spec.md) */
+/* Total drag of aircraft p at EAS V and weight w, at its cruise altitude, including compressibility */
+function dragFull(p,V,w){var d=drag(w,V,p.S,p.AR,p.CD0,p.e),M=V/Math.sqrt(sigmaAt(p.h))/(A0*Math.sqrt(thetaAt(p.h))),Dc=d.q*p.S*dCDat(M,p.Mcrit);return {q:d.q,Dp:d.Dp,Dc:Dc,Di:d.Di,D:d.D+Dc,M:M};}
+/* One mission: payload P and fuel F (see docs/payload-range-spec.md, version 2) */
 function mission(p,x,P,F){
-  var T=x.We+P+F, Fc=p.fc*T, w1=T-Fc, Fr=0, i, nf, w2;
-  for(i=0;i<50;i++){nf=(p.tr/60)*x.ff(x.We+P+Fr); if(Math.abs(nf-Fr)<0.01){Fr=nf;break;} Fr=nf;}
-  w2=x.We+P+Fr; var Fcr=F-Fc-Fr, R=0;
-  if(Fcr>0){var k=Math.sqrt(x.k2/x.k0), J=(Math.atan(w1*k)-Math.atan(w2*k))/Math.sqrt(x.k0*x.k2); R=x.K*J;}
-  return {P:P,F:F,T:T,Fc:Fc,Fr:Fr,Fcr:Fcr,R:R,w1:w1,w2:w2};
+  var T=x.We+P+F, Ft=p.ft*T, wc=T-Ft, cl=x.climb(wc), w1=wc-cl.F, Fr=0, i, nf;
+  /* reserve fixed point; if it runs away (reserve heavier than the whole takeoff weight) the mission can't be flown, so stop there */
+  for(i=0;i<50;i++){nf=(p.tr/60)*x.ff(x.We+P+Fr); if(!(nf<=T)){Fr=T;break;} if(Math.abs(nf-Fr)<0.01){Fr=nf;break;} Fr=nf;}
+  var w2=x.We+P+Fr, de=x.descent(w2), w3=w2+de.F, Fcr=w1-w3, Rcr=0, R=0;
+  if(Fcr>0){var k=Math.sqrt(x.k2/x.k0), J=(Math.atan(w1*k)-Math.atan(w3*k))/Math.sqrt(x.k0*x.k2); Rcr=x.K*J; R=cl.X+Rcr+de.X;}
+  return {P:P,F:F,T:T,Ft:Ft,wc:wc,Fcl:cl.F,Xc:cl.X,tc:cl.t,w1:w1,Fr:Fr,w2:w2,Fde:de.F,Xd:de.X,w3:w3,Fcr:Fcr,Rcr:Rcr,R:R};
 }
 function model(p){
   var W=p.W,V=p.V,S=p.S,AR=p.AR;
@@ -241,22 +254,35 @@ function model(p){
   var Vs=Math.sqrt(2*W/(RHO*S*p.CLmax))/KT, mu=2*WS/(RHO*c*a*G0), Kg=0.88*mu/(5.3+mu), n=1+Kg*UDE*V*a/(498*WS);
   var K=1/(Math.PI*AR*p.e), LDmax=0.5/Math.sqrt(p.CD0*K), Vmd=Math.sqrt(2*WS/RHO*Math.sqrt(K/p.CD0))/KT;
   var We=p.fe*W+p.ws*S, U=W-We;
-  var sigma=sigmaAt(p.h), VTAS=V/Math.sqrt(sigma);
+  var sigma=sigmaAt(p.h), theta=thetaAt(p.h), VTAS=V/Math.sqrt(sigma), asnd=A0*Math.sqrt(theta), M=VTAS/asnd, dCD=dCDat(M,p.Mcrit), Dc=d.q*S*dCD, D=d.D+Dc;
   var isProp=p.prop!=="jet";
-  var x={We:We,k0:d.Dp,k2:1/(d.q*Math.PI*AR*S*p.e)};
+  var x={We:We,Dp:d.Dp,k0:d.Dp+Dc,k2:1/(d.q*Math.PI*AR*S*p.e)};
   x.D=function(w){return x.k0+x.k2*w*w;};
   x.ff=isProp?function(w){return p.cp*x.D(w)*VTAS*KT/(550*p.eta);}:function(w){return p.ct*x.D(w);};
   x.K=isProp?550*p.eta/(KT*p.cp):VTAS/p.ct;
-  var pr;
-  if(U<=0){var z={P:0,F:0,T:We,Fc:0,Fr:0,Fcr:0,R:0,w1:We,w2:We}; pr={A:z,B:z,C:z,D:z};}
+  var Vm=V/Math.sqrt(sigmaAt(p.h/2)); // mean true airspeed in climb and descent
+  x.climb=function(w){ if(!(p.h>0&&p.roc>0)) return {F:0,X:0,t:0};
+    var t=p.h/p.roc, Dcl=x.Dp+x.k2*w*w, ff=isProp?p.cp*(Dcl*Vm*KT+w*p.roc/60)/(550*p.eta):p.ct*(Dcl+w*(p.roc/60)/(Vm*KT));
+    return {F:ff*t/60,X:Vm*t/60,t:t,ff:ff}; };
+  x.descent=function(w){ if(!(p.h>0)) return {F:0,X:0,t:0};
+    var G=w/(x.Dp+x.k2*w*w), X=p.h*G/NMFT, t=X/Vm; return {F:IDLE*x.ff(w)*t,X:X,t:t,G:G}; };
+  var PL=p.WL-We-(p.tr/60)*x.ff(p.WL), Pstar=Math.max(0,Math.min(p.Pmax,PL)), pr;
+  if(U<=0){var z={P:0,F:0,T:We,Ft:0,wc:We,Fcl:0,Xc:0,tc:0,w1:We,Fr:0,w2:We,Fde:0,Xd:0,w3:We,Fcr:0,Rcr:0,R:0}; pr={A:z,B:z,C:z,D:z};}
   else{
-    var Pm=Math.max(0,p.Pmax),Fm=Math.max(0,p.Fmax);
-    var PB=Math.min(Pm,U), FB=Math.min(Fm,U-PB), FC=Math.min(Fm,U), PC=Math.min(Pm,U-FC);
+    var Fm=Math.max(0,p.Fmax), PB=Math.min(Pstar,U), FB=Math.min(Fm,U-PB), FC=Math.min(Fm,U), PC=Math.min(Pstar,U-FC);
     pr={A:mission(p,x,PB,0),B:mission(p,x,PB,FB),C:mission(p,x,PC,FC),D:mission(p,x,0,FC)};
   }
-  var w0=W*(1-p.fc);
-  return {S:S,b:b,c:c,CLa:a,WS:WS,Vs:Vs,q:d.q,mu:mu,Kg:Kg,n:n,Dp:d.Dp,Di:d.Di,D:d.D,LD:W/d.D,LDmax:LDmax,Vmd:Vmd,We:We,U:U,
-    sigma:sigma,VTAS:VTAS,k0:x.k0,k2:x.k2,Krange:x.K,w0:w0,D0:x.D(w0),ff0:x.ff(w0),pr:pr,RB:pr.B.R,RC:pr.C.R,RD:pr.D.R,PC:pr.C.P,PB:pr.B.P};
+  var w0=W*(1-p.ft);
+  /* best-range speed: maximise specific range at weight w0 over EAS (400-step grid, then golden section) */
+  var sr=function(v){var D2=dragFull(p,v,w0).D; return isProp?1/D2:(v/Math.sqrt(sigma))/D2;};
+  var lo=Math.max(40,1.1*Vs), hi=500, Vbest=hi;
+  if(lo<hi){var N=400,bi=0,bs=-1,j,v; for(j=0;j<=N;j++){v=lo+(hi-lo)*j/N; var s=sr(v); if(s>bs){bs=s;bi=j;}}
+    var gl=lo+(hi-lo)*Math.max(0,bi-1)/N, gh=lo+(hi-lo)*Math.min(N,bi+1)/N, g=(Math.sqrt(5)-1)/2, c1=gh-g*(gh-gl), c2=gl+g*(gh-gl), s1=sr(c1), s2=sr(c2);
+    while(gh-gl>0.01){ if(s1>s2){gh=c2;c2=c1;s2=s1;c1=gh-g*(gh-gl);s1=sr(c1);} else {gl=c1;c1=c2;s1=s2;c2=gl+g*(gh-gl);s2=sr(c2);} }
+    Vbest=(gl+gh)/2;}
+  return {S:S,b:b,c:c,CLa:a,WS:WS,Vs:Vs,q:d.q,mu:mu,Kg:Kg,n:n,Dp:d.Dp,Dc:Dc,Di:d.Di,D:D,LD:W/D,LDmax:LDmax,Vmd:Vmd,We:We,U:U,
+    sigma:sigma,theta:theta,VTAS:VTAS,a:asnd,M:M,dCD:dCD,k0:x.k0,k2:x.k2,Krange:x.K,w0:w0,D0:x.D(w0),ff0:x.ff(w0),
+    PL:PL,Pstar:Pstar,Vbest:Vbest,climbB:pr.B.tc,pr:pr,RB:pr.B.R,RC:pr.C.R,RD:pr.D.R,PC:pr.C.P,PB:pr.B.P};
 }
 function evaluate(st){return model(st);}
 if(typeof module!=="undefined") module.exports={model:model,sizeWing:sizeWing,sigmaAt:sigmaAt,evaluate:evaluate,PRESETS:PRESETS};
@@ -280,11 +306,12 @@ var RANGE={
  CLmax:{min:0.8,max:4.0,step:0.05}, AR:{min:3,max:40,step:0.1}, h:{min:0,max:51000,step:500},
  CD0:{min:0.008,max:0.12,step:0.001}, e:{min:0.5,max:1.0,step:0.01}, ws:{min:0,max:30,step:0.1}, We:{min:100,max:1000000,log:true},
  cp:{min:0.25,max:1.2,step:0.01}, eta:{min:0.4,max:0.95,step:0.01}, ct:{min:0.3,max:1.5,step:0.01},
- Fmax:{min:10,max:400000,log:true}, Pmax:{min:10,max:300000,log:true}, tr:{min:0,max:120,step:5}, fc:{min:0,max:0.08,step:0.001}
+ Fmax:{min:10,max:400000,log:true}, Pmax:{min:10,max:300000,log:true}, WL:{min:500,max:1300000,log:true}, tr:{min:0,max:120,step:5},
+ ft:{min:0,max:0.03,step:0.0001}, roc:{min:0,max:6000,step:10}, Mcrit:{min:0.5,max:0.95,step:0.01}
 };
 var curPreset="skyvan", REF, base0;
 var st,pinned=null,touched="W",selNode=null;
-function copyInputs(o){var r={};["W","V","S","CLmax","AR","CD0","e","fe","ws","h","prop","cp","eta","ct","Fmax","Pmax","tr","fc"].forEach(function(k){r[k]=o[k];});return r;}
+function copyInputs(o){var r={};["W","V","S","CLmax","AR","CD0","e","fe","ws","h","prop","cp","eta","ct","Fmax","Pmax","WL","tr","ft","roc","Mcrit"].forEach(function(k){r[k]=o[k];});return r;}
 function setRef(o,name){REF=copyInputs(o); REF.name=name; base0=model(REF);}
 function reset(){Object.keys(sEls).forEach(function(id){sEls[id].typing=false;}); /* a preset change or Reset discards unapplied typing */
   st=copyInputs(PRESETS[curPreset]); setRef(st,PRESETS[curPreset].name); pinned=null; touched="W"; selNode=null; render();}
@@ -351,7 +378,7 @@ function setInput(id,v){
   else if(id==="D"){
     /* Solve on the fast side of minimum drag, where drag rises with speed. If minimum drag is above the top of the speed range,
        the whole range is on the slow side, where drag falls with speed; solve there instead. */
-    var Vlo=RANGE.V.min,Vhi=RANGE.V.max,Vmd=model(st).Vmd,dd=function(x){return drag(st.W,x,st.S,st.AR,st.CD0,st.e).D;};
+    var Vlo=RANGE.V.min,Vhi=RANGE.V.max,Vmd=model(st).Vmd,dd=function(x){return dragFull(st,x,st.W).D;};
     var fast=Vmd<Vhi, lo=fast?Math.max(Vlo,Vmd):Vlo, hi=Vhi, dLo=dd(lo), dHi=dd(hi), dMin=Math.min(dLo,dHi), dMax=Math.max(dLo,dHi);
     if(v<=dMin) clampSet("V",fast?lo:hi); else if(v>=dMax) clampSet("V",fast?hi:lo);
     else {for(var i=0;i<60;i++){var mid=(lo+hi)/2; if((dd(mid)<v)===fast) lo=mid; else hi=mid;} clampSet("V",(lo+hi)/2);} }
@@ -390,10 +417,13 @@ var SL={
  ct:{label:"Thrust specific fuel consumption",unit:"lb/lbf/h",dec:2,jet:true},
  Fmax:{label:"Maximum fuel",unit:"lb",auto:true},
  Pmax:{label:"Maximum payload",unit:"lb",auto:true,hint:"Structural or cabin limit. Crew counts as payload."},
+ WL:{label:"Maximum landing weight",unit:"lb",auto:true,hint:"Caps the payload so the aircraft lands at or below this weight with its reserve."},
  tr:{label:"Reserve",unit:"min",dec:0,hint:"Flown at cruise fuel flow."},
- fc:{label:"Takeoff and climb fuel",unit:"% TOW",dec:1,scale:100,hint:"Percent of takeoff weight. Burned with no range credit."}
+ ft:{label:"Taxi and takeoff fuel",unit:"% TOW",dec:2,scale:100,hint:"Percent of takeoff weight, burned before the climb."},
+ roc:{label:"Average climb rate",unit:"ft/min",dec:0,hint:"Climb to cruise altitude at the cruise equivalent airspeed. 0 leaves the climb out."},
+ Mcrit:{label:"Critical Mach number",unit:"",dec:2,hint:"Above this, compressibility drag rises steeply (Lock's fourth-power law)."}
 };
-var GROUPS={sliders:["Vs","S","W","V","CLmax","AR","h"],constSliders:["CD0","e","We","ws"],prSliders:["cp","eta","ct","Fmax","Pmax","tr","fc"]};
+var GROUPS={sliders:["Vs","S","W","V","CLmax","AR","h"],constSliders:["CD0","e","Mcrit","We","ws"],prSliders:["cp","eta","ct","Fmax","Pmax","WL","tr","ft","roc"]};
 var sEls={};
 function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:id==="We"?r.We:st[id];}
 function toPos(id,v){var R=RANGE[id]; return R.log?1000*Math.log(Math.max(R.min,v)/R.min)/Math.log(R.max/R.min):v;}
@@ -428,14 +458,23 @@ $("#bJet").addEventListener("click",function(){st.prop="jet"; touched="W"; rende
 
 function tileHTML(t){var d=t[3]>0?100*(t[2]/t[3]-1):NaN;return '<div class="tile"><div class="k">'+t[0]+'</div><div class="n">'+t[1]+'</div><div class="d">'+(isNaN(d)?"–":Math.abs(d)<0.05?"reference":pct(d))+'</div></div>';}
 function renderTiles(r){var T=[["Wing loading",r.WS.toFixed(1)+" lb/ft²",r.WS,base0.WS],["Span",fmtA(r.b)+" ft",r.b,base0.b],["Empty weight",fmtA(r.We)+" lb",r.We,base0.We],
-  ["Lift to drag at cruise",r.LD.toFixed(1),r.LD,base0.LD],["Best lift to drag",r.LDmax.toFixed(1),r.LDmax,base0.LDmax],["Minimum drag speed",fmt(r.Vmd)+" kt",r.Vmd,base0.Vmd],["True airspeed",fmt(r.VTAS)+" kt",r.VTAS,base0.VTAS]];
+  ["Lift to drag at cruise",r.LD.toFixed(1),r.LD,base0.LD],["Best lift to drag",r.LDmax.toFixed(1),r.LDmax,base0.LDmax],["Minimum drag speed",fmt(r.Vmd)+" kt",r.Vmd,base0.Vmd],["True airspeed",fmt(r.VTAS)+" kt",r.VTAS,base0.VTAS],["Mach number",r.M.toFixed(3),r.M,base0.M]];
   $("#tiles").innerHTML=T.map(tileHTML).join("");
-  var P=[["Range, max payload",fmt(r.RB)+" nmi",r.RB,base0.RB],["Payload, full tanks",fmtA(r.PC)+" lb",r.PC,base0.PC],["Range, full tanks",fmt(r.RC)+" nmi",r.RC,base0.RC],["Ferry range",fmt(r.RD)+" nmi",r.RD,base0.RD],["Cruise fuel flow",fmtA(r.ff0)+" lb/h",r.ff0,base0.ff0]];
+  var P=[["Range, max payload",fmt(r.RB)+" nmi",r.RB,base0.RB],["Payload, full tanks",fmtA(r.PC)+" lb",r.PC,base0.PC],["Range, full tanks",fmt(r.RC)+" nmi",r.RC,base0.RC],["Ferry range",fmt(r.RD)+" nmi",r.RD,base0.RD],["Cruise fuel flow",fmtA(r.ff0)+" lb/h",r.ff0,base0.ff0],["Best-range speed",fmt(r.Vbest)+" kt EAS",r.Vbest,base0.Vbest]];
   $("#prTiles").innerHTML=P.map(tileHTML).join("");
   var w=[]; if(r.U<=0) w.push("Empty weight is at or above gross weight, so there is no useful load.");
-  else { if(r.pr.B.F>0&&r.RB===0) w.push("At maximum payload, the climb allowance and reserve use all the fuel that fits."); if(st.V<r.Vs) w.push("Cruise speed is below the stall speed."); }
+  else {
+    if(r.pr.B.F>0&&r.RB===0) w.push("At maximum payload, taxi, climb, descent and reserve fuel use all the fuel that fits.");
+    if(r.Pstar<st.Pmax) w.push("Maximum payload is limited to "+fmtA(r.Pstar)+" lb by the landing weight.");
+    if(st.V<r.Vs) w.push("Cruise speed is below the stall speed.");
+    if(r.M>st.Mcrit+0.1) w.push("Cruise Mach "+r.M.toFixed(2)+" is past drag divergence, where the drag law is only a rough extrapolation.");
+  }
   $("#prWarn").textContent=w.join(" ");
+  var vb=Math.round(r.Vbest), same=Math.abs(vb-st.V)<0.5;
+  $("#btnBest").disabled=same; $("#btnBest").textContent=same?"Flying at best-range speed":"Fly at best-range speed ("+vb+" kt)";
+  $("#bestNote").textContent=st.prop==="jet"?"For a jet: highest true airspeed per pound of drag.":"For a propeller: lowest drag, so the minimum-drag speed unless compressibility moves it.";
 }
+$("#btnBest").addEventListener("click",function(){setInput("V",Math.round(window.__last.Vbest));});
 
 /* chart helpers */
 function niceStep(x){var p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p; return (f<1.5?1:f<3?2:f<7?5:10)*p;}
@@ -449,17 +488,22 @@ function renderCurve(r){var s=$("#curve"); s.textContent=""; var v,d;
   var vx=niceAxis(Math.max(1.5*st.V,1.9*r.Vmd,1.4*r.Vs),8), dy=niceAxis(Math.max(2.2*dmin,1.15*r.D),6);
   var vmax=vx.max,dmax=dy.max;
   var cx=function(v){return CV.x0+(CV.x1-CV.x0)*v/vmax;}, cy=function(d){return CV.y0-(CV.y0-CV.y1)*Math.min(d,dmax)/dmax;};
-  var path=function(p,vs,key){var out="",i,N=140,v0=Math.max(vs,vmax*0.02);for(i=0;i<=N;i++){var vv=v0+(vmax-v0)*i/N,dd=drag(p.W,vv,p.S,p.AR,p.CD0,p.e)[key];out+=(out?"L":"M")+cx(vv).toFixed(1)+" "+cy(dd).toFixed(1);}return out;};
+  /* curves at each aircraft's own cruise altitude, so compressibility drag shows where Mach passes the critical value */
+  var maxDc=0, path=function(p,vs,key){var out="",i,N=140,v0=Math.max(vs,vmax*0.02);for(i=0;i<=N;i++){var vv=v0+(vmax-v0)*i/N,f=dragFull(p,vv,p.W),dd=f[key]; if(p===st&&f.Dc>maxDc)maxDc=f.Dc; out+=(out?"L":"M")+cx(vv).toFixed(1)+" "+cy(dd).toFixed(1);}return out;};
   for(d=0;d<=dmax+1e-9;d+=dy.step){s.appendChild(el("line",{x1:CV.x0,x2:CV.x1,y1:cy(d),y2:cy(d),"class":"gl"}));s.appendChild(el("text",{x:CV.x0-8,y:cy(d)+4,"text-anchor":"end","class":"tk"},tickLabel(d)));}
   for(v=0;v<=vmax+1e-9;v+=vx.step){s.appendChild(el("text",{x:cx(v),y:CV.y0+16,"text-anchor":"middle","class":"tk"},fmt(v)));}
   s.appendChild(el("text",{x:CV.x1,y:CV.y0+32,"text-anchor":"end","class":"tk"},"Equivalent airspeed, kt")); s.appendChild(el("text",{x:CV.x0,y:10,"class":"tk"},"Drag, lb"));
   s.appendChild(el("path",{d:path(REF,base0.Vs,"D"),"class":"cb"}));
   s.appendChild(el("path",{d:path(st,r.Vs,"Dp"),"class":"c1"}));
   s.appendChild(el("path",{d:path(st,r.Vs,"Di"),"class":"c2"}));
+  var dcPath=path(st,r.Vs,"Dc"); if(maxDc>0.5) s.appendChild(el("path",{d:dcPath,"class":"c3"}));
+  document.getElementById("lgDc").hidden=!(maxDc>0.5);
   s.appendChild(el("path",{d:path(st,r.Vs,"D"),"class":"ct"}));
+  if(r.Vbest<vmax){var yb=cy(dragFull(st,r.Vbest,st.W).D); s.appendChild(el("path",{d:"M"+cx(r.Vbest)+" "+(yb-7)+"l7 7l-7 7l-7 -7z","class":"bestmk"}));
+    s.appendChild(el("text",{x:cx(r.Vbest),y:yb+26,"text-anchor":"middle","class":"lb"},"Best range "+fmt(r.Vbest)+" kt"));}
   var xs=cx(Math.min(vmax,r.Vs)); s.appendChild(el("line",{x1:xs,x2:xs,y1:CV.y1,y2:CV.y0,"class":"vs"}));
   s.appendChild(el("text",{x:xs+6,y:CV.y1+12,"class":"lb"},"Stall "+r.Vs.toFixed(1)+" kt"));
-  var ym=cy(drag(st.W,r.Vmd,r.S,st.AR,st.CD0,st.e).D); if(r.Vmd>r.Vs&&r.Vmd<vmax){s.appendChild(el("circle",{cx:cx(r.Vmd),cy:ym,r:4,"class":"md"})); s.appendChild(el("text",{x:cx(r.Vmd),y:ym+18,"text-anchor":"middle","class":"lb"},"Minimum drag"));}
+  var ym=cy(dragFull(st,r.Vmd,st.W).D); if(r.Vmd>r.Vs&&r.Vmd<vmax&&Math.abs(cx(r.Vmd)-cx(r.Vbest))>40){s.appendChild(el("circle",{cx:cx(r.Vmd),cy:ym,r:4,"class":"md"})); s.appendChild(el("text",{x:cx(r.Vmd),y:ym+18,"text-anchor":"middle","class":"lb"},"Minimum drag"));}
   var xc=cx(st.V),yc=cy(r.D); s.appendChild(el("circle",{cx:xc,cy:yc,r:7,"class":"cr"}));
   s.appendChild(el("text",{x:xc,y:yc-12,"text-anchor":"middle","class":"lb b"},"Cruise "+fmtA(r.D)+" lb"));
   window.__curveAxes={vmax:vmax,dmax:dmax};
@@ -562,7 +606,8 @@ function renderMath(r){var W=st.W,V=st.V,f=fmtA,rows=[],B=r.pr.B,isProp=st.prop!
   rows.push(["Dynamic pressure","½ × ρ × (V × 1.688)²","0.5 × 0.002377 × ("+fmt(V)+" × 1.688)²",r.q.toFixed(1)+" lb/ft²"]);
   rows.push(["Parasite drag","q × S × CD0",r.q.toFixed(1)+" × "+f(r.S)+" × "+st.CD0.toFixed(3),f(r.Dp)+" lb"]);
   rows.push(["Induced drag","W² ÷ (q × π × span² × e)",f(W)+"² ÷ ("+r.q.toFixed(1)+" × π × "+f(r.b)+"² × "+st.e.toFixed(2)+")",f(r.Di)+" lb"]);
-  rows.push(["Cruise drag","parasite + induced",f(r.Dp)+" + "+f(r.Di),f(r.D)+" lb"]);
+  rows.push(["Compressibility drag","q × S × ΔCD (see Mach rows)",r.q.toFixed(1)+" × "+f(r.S)+" × "+r.dCD.toFixed(5),f(r.Dc)+" lb"]);
+  rows.push(["Cruise drag","parasite + compressibility + induced",f(r.Dp)+" + "+f(r.Dc)+" + "+f(r.Di),f(r.D)+" lb"]);
   rows.push(["Mass ratio","2(W/S) ÷ (ρ × chord × lift slope × g)","2 × "+r.WS.toFixed(1)+" ÷ (0.002377 × "+r.c.toFixed(2)+" × "+r.CLa.toFixed(2)+" × 32.2)",r.mu.toFixed(1)]);
   rows.push(["Gust alleviation","0.88μ ÷ (5.3 + μ)","0.88 × "+r.mu.toFixed(1)+" ÷ (5.3 + "+r.mu.toFixed(1)+")",r.Kg.toFixed(3)]);
   rows.push(["Gust load factor","1 + Kg × 50 × V × lift slope ÷ (498 × W/S)","1 + "+r.Kg.toFixed(3)+" × 50 × "+fmt(V)+" × "+r.CLa.toFixed(2)+" ÷ (498 × "+r.WS.toFixed(1)+")",r.n.toFixed(2)+" g"]);
@@ -571,15 +616,24 @@ function renderMath(r){var W=st.W,V=st.V,f=fmtA,rows=[],B=r.pr.B,isProp=st.prop!
   g("Altitude and fuel flow");
   rows.push(["Density ratio",st.h<=36089?"(1 − 6.8756×10⁻⁶ × h)^4.2559":"0.29708 × e^(−(h − 36,089) ÷ 20,806)",st.h<=36089?"(1 − 6.8756×10⁻⁶ × "+fmt(st.h)+")^4.2559":"0.29708 × e^(−("+fmt(st.h)+" − 36,089) ÷ 20,806)",r.sigma.toFixed(4)]);
   rows.push(["True airspeed","V ÷ √σ",fmt(V)+" ÷ √"+r.sigma.toFixed(4),fmt(r.VTAS,1)+" kt"]);
-  rows.push(["Drag at start of cruise","k₀ + k₂ × w², w = W × (1 − climb)",f(r.k0)+" + "+r.k2.toExponential(3)+" × "+f(r.w0)+"²",f(r.D0)+" lb"]);
+  rows.push(["Speed of sound","661.48 × √θ, θ = "+(st.h<=36089?"1 − 6.8756×10⁻⁶ × h":"0.7519"),"661.48 × √"+r.theta.toFixed(4),fmt(r.a,1)+" kt"]);
+  rows.push(["Mach number","V_true ÷ a",fmt(r.VTAS,1)+" ÷ "+fmt(r.a,1),r.M.toFixed(3)]);
+  rows.push(["Compressibility ΔCD","20 × (M − M_crit)⁴ above M_crit",r.M>st.Mcrit?"20 × ("+r.M.toFixed(3)+" − "+st.Mcrit.toFixed(2)+")⁴":"M below "+st.Mcrit.toFixed(2),r.dCD.toFixed(5)]);
+  rows.push(["Drag at start of climb weight","k₀ + k₂ × w², w = W × (1 − taxi)",f(r.k0)+" + "+r.k2.toExponential(3)+" × "+f(r.w0)+"²",f(r.D0)+" lb"]);
   if(isProp) rows.push(["Fuel flow","c_p × D × V_true × 1.688 ÷ (550 η)",st.cp.toFixed(2)+" × "+f(r.D0)+" × "+fmt(r.VTAS,1)+" × 1.688 ÷ (550 × "+st.eta.toFixed(2)+")",f(r.ff0)+" lb/h"]);
   else rows.push(["Fuel flow","c_t × D",st.ct.toFixed(2)+" × "+f(r.D0),f(r.ff0)+" lb/h"]);
   g("Range at maximum payload (point B)");
   rows.push(["Takeoff weight","empty + payload + fuel",f(r.We)+" + "+f(B.P)+" + "+f(B.F),f(B.T)+" lb"]);
-  rows.push(["Takeoff and climb fuel","climb allowance × takeoff weight",(st.fc*100).toFixed(1)+"% × "+f(B.T),f(B.Fc)+" lb"]);
+  rows.push(["Payload limit","min(max payload, landing weight − empty − reserve)","min("+f(st.Pmax)+", "+f(st.WL)+" − "+f(r.We)+" − reserve)",f(r.Pstar)+" lb"]);
+  rows.push(["Taxi and takeoff fuel","taxi fraction × takeoff weight",(st.ft*100).toFixed(2)+"% × "+f(B.T),f(B.Ft)+" lb"]);
+  rows.push(["Climb",st.h>0&&st.roc>0?"time h ÷ climb rate; power for drag and for climbing":"no climb segment",st.h>0&&st.roc>0?fmt(st.h)+" ft ÷ "+fmt(st.roc)+" ft/min = "+B.tc.toFixed(1)+" min":"–",f(B.Fcl)+" lb, "+fmt(B.Xc)+" nmi"]);
   rows.push(["Reserve fuel","(reserve min ÷ 60) × fuel flow at landing weight","("+st.tr+" ÷ 60) × fuel flow at "+f(B.w2),f(B.Fr)+" lb"]);
-  rows.push(["Cruise fuel","fuel − climb − reserve",f(B.F)+" − "+f(B.Fc)+" − "+f(B.Fr),f(B.Fcr)+" lb"]);
-  rows.push(["Range",(isProp?"(550η ÷ (1.688 c_p))":"(V_true ÷ c_t)")+" × ∫ dw ÷ D(w)",B.Fcr>0?(f(r.Krange)+" × ∫ from "+f(B.w2)+" to "+f(B.w1)):"no cruise fuel",fmt(B.R)+" nmi"]);
+  rows.push(["Descent","idle glide at L/D; fuel 10% of cruise flow","glide from "+fmt(st.h)+" ft",f(B.Fde)+" lb, "+fmt(B.Xd)+" nmi"]);
+  rows.push(["Cruise fuel","fuel − taxi − climb − descent − reserve",f(B.F)+" − "+f(B.Ft)+" − "+f(B.Fcl)+" − "+f(B.Fde)+" − "+f(B.Fr),f(B.Fcr)+" lb"]);
+  rows.push(["Cruise distance",(isProp?"(550η ÷ (1.688 c_p))":"(V_true ÷ c_t)")+" × ∫ dw ÷ D(w)",B.Fcr>0?(f(r.Krange)+" × ∫ from "+f(B.w3)+" to "+f(B.w1)):"no cruise fuel",fmt(B.Rcr)+" nmi"]);
+  rows.push(["Range","climb + cruise + descent",B.Fcr>0?fmt(B.Xc)+" + "+fmt(B.Rcr)+" + "+fmt(B.Xd):"can't be flown",fmt(B.R)+" nmi"]);
+  g("Best-range speed");
+  rows.push(["Best-range speed",isProp?"speed of least drag at W × (1 − taxi)":"speed of most true airspeed per lb of drag","search "+fmt(Math.max(40,1.1*r.Vs))+" to 500 kt",fmt(r.Vbest,1)+" kt EAS"]);
   $("#math tbody").innerHTML=rows.map(function(x){return x[0].indexOf("__")===0?'<tr class="grp"><td colspan="4">'+x[0].slice(2)+"</td></tr>":"<tr><td>"+x[0]+"</td><td>"+x[1]+"</td><td>"+x[2]+"</td><td>"+x[3]+"</td></tr>";}).join("");
 }
 function renderNotes(){
@@ -591,7 +645,7 @@ function renderNotes(){
    "<p><b>Drag.</b> Parasite drag goes with speed squared and wing area. Induced drag goes with weight squared and falls with speed squared and span squared. Their sum is lowest where the two are equal.</p>"+
    "<p><b>Range.</b> Range comes from the fuel burned in cruise divided by drag, integrated as the aircraft gets lighter. Propeller range depends on propeller efficiency over brake specific fuel consumption; jet range also grows with true airspeed, which is why jets cruise high.</p>"+
    "<p><b>Starting point: "+P.name+".</b> "+P.note+"</p>"+
-   "<p><b>Assumptions.</b> Speeds that set drag are equivalent airspeed. No compressibility, so jet results are rough. The gust load factor uses the FAR 23 formula with sea-level density and a 50 ft/s gust. Empty weight follows a two-term rule fitted to one point per aircraft, so it gives trends, not predictions. Range is flown at constant altitude and equivalent airspeed with no climb or descent distance; crew counts as payload. The radar is a log scale from 25% to 400% of the reference.</p>";
+   "<p><b>Assumptions.</b> Speeds that set drag are equivalent airspeed. Compressibility drag follows Lock's fourth-power law above the critical Mach number, a rough fit that gets rougher past drag divergence. The gust load factor uses the FAR 23 formula with sea-level density and a 50 ft/s gust. Empty weight follows a two-term rule fitted to one point per aircraft, so it gives trends, not predictions. The mission is taxi and takeoff, a climb at the cruise equivalent airspeed and constant weight, cruise at constant altitude and speed, and an idle glide descent at 10% of cruise fuel flow. Installed power or thrust isn't checked, so the page can't tell you if the climb rate is achievable. Crew counts as payload. The radar is a log scale from 25% to 400% of the reference.</p>";
 }
 function render(){var r=evaluate(st); window.__last=r; renderNotes(); renderRadar(r);renderSliders(r);renderTiles(r);renderPR(r);renderCurve(r);renderMap(r);renderSens(r);renderMath(r);}
 $("#btnReset").addEventListener("click",reset);

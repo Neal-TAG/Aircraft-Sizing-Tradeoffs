@@ -163,14 +163,19 @@ const tests = {
       if (!(err <= absTol || rel <= 1e-9)) bad.push(`${label}: page ${a} vs ${e}`); };
     for (const { id, r } of got) {
       const e = expected[id];
-      for (const k of ['Vs', 'b', 'WS', 'We', 'U', 'q', 'Dp', 'Di', 'LD', 'LDmax', 'Vmd', 'n', 'sigma', 'VTAS', 'ff0']) cmp(`${id}.${k}`, r[k], e[k], 1e-9);
-      cmp(`${id}.D(total)`, r.D, e.Dp + e.Di, 1e-9);
+      for (const k of ['Vs', 'b', 'WS', 'We', 'U', 'q', 'Dp', 'Dc', 'Di', 'D', 'LD', 'LDmax', 'Vmd', 'n']) cmp(`${id}.${k}`, r[k], e.sizing[k], 1e-9);
+      for (const k of ['sigma', 'theta', 'VTAS', 'a', 'M', 'dCD']) cmp(`${id}.${k}`, r[k], e.atmosphere[k], 1e-12);
+      cmp(`${id}.ff0`, r.ff0, e.ff0, 1e-9); cmp(`${id}.PL`, r.PL, e.PL, 1e-6); cmp(`${id}.Pstar`, r.Pstar, e.Pstar, 1e-6);
+      cmp(`${id}.Vbest`, r.Vbest, e.Vbest, 0.02);   // both use a golden-section search to 0.01 kt
       for (const P of ['A', 'B', 'C', 'D']) {
-        const m = r.pr[P], x = e[P];
+        const m = r.pr[P], x = e.points[P], U0 = e.sizing.U > 0;
         cmp(`${id}.${P}.payload`, m.P, x.payload, 1e-6); cmp(`${id}.${P}.fuel`, m.F, x.fuel, 1e-6);
-        // with no useful load the spec leaves takeoff weight undefined (page: empty weight, independent: 0)
-        if (e.U > 0) cmp(`${id}.${P}.takeoff`, m.T, x.takeoffWeight, 1e-6); else skippedT++;
-        cmp(`${id}.${P}.reserve`, m.Fr, x.reserve, 0.02); cmp(`${id}.${P}.range`, m.R, x.range, 0.01);
+        // with no useful load the spec leaves takeoff weight and segment values undefined (page: empty weight, independent: 0)
+        if (!U0) { skippedT++; cmp(`${id}.${P}.range`, m.R, x.range, 0.01); continue; }
+        cmp(`${id}.${P}.takeoff`, m.T, x.takeoffWeight, 1e-6); cmp(`${id}.${P}.taxi`, m.Ft, x.taxiFuel, 1e-6);
+        cmp(`${id}.${P}.climbFuel`, m.Fcl, x.climbFuel, 1e-6); cmp(`${id}.${P}.climbDist`, m.Xc, x.climbDist, 1e-6);
+        cmp(`${id}.${P}.reserve`, m.Fr, x.reserve, 0.02); cmp(`${id}.${P}.descentFuel`, m.Fde, x.descentFuel, 0.01); cmp(`${id}.${P}.descentDist`, m.Xd, x.descentDist, 1e-4);
+        cmp(`${id}.${P}.cruiseFuel`, m.Fcr, x.cruiseFuel, 0.05); cmp(`${id}.${P}.cruiseDist`, m.Rcr, x.cruiseDist, 0.01); cmp(`${id}.${P}.range`, m.R, x.range, 0.01);
       }
     }
     return { pass: bad.length === 0, detail: `${got.length} cases, ${compared} values (${skippedT} undefined takeoff weights skipped), ${bad.length} mismatched` + (bad.length ? ': ' + bad.slice(0, 3).join('; ') : `; closest call ${worstAt}`) };
@@ -213,7 +218,7 @@ const tests = {
   async propJetSwitch(page) {
     const vis = () => page.evaluate(() => ['cp', 'eta', 'ct'].map(id => !document.getElementById('n_' + id).closest('.row').hidden));
     // range ÷ ∫dw/D must equal the propulsion constant: 550η/(1.688 c_p) for prop, V_true/c_t for jet
-    const constant = s => { const m = s.r.pr.C, k = Math.sqrt(s.r.k2 / s.r.k0), J = (Math.atan(m.w1 * k) - Math.atan(m.w2 * k)) / Math.sqrt(s.r.k0 * s.r.k2); return m.R / J; };
+    const constant = s => { const m = s.r.pr.C, k = Math.sqrt(s.r.k2 / s.r.k0), J = (Math.atan(m.w1 * k) - Math.atan(m.w3 * k)) / Math.sqrt(s.r.k0 * s.r.k2); return m.Rcr / J; };
     const a = await vis(), sa = await state(page);
     await page.click('#bJet');
     const b = await vis(), sb = await state(page);
@@ -247,10 +252,10 @@ const tests = {
   async payloadRangeShape(page) {
     const res = await page.evaluate(() => {
       const bad = []; let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      const lim = { W: [500, 1300000], S: [30, 10000], V: [40, 500], AR: [3, 40], h: [0, 51000], Fmax: [10, 400000], Pmax: [10, 300000], tr: [0, 120], fc: [0, 0.08], CD0: [0.008, 0.12] };
+      const lim = { W: [500, 1300000], S: [30, 10000], V: [40, 500], AR: [3, 40], h: [0, 51000], Fmax: [10, 400000], Pmax: [10, 300000], WL: [500, 1300000], tr: [0, 120], ft: [0, 0.03], roc: [0, 6000], Mcrit: [0.5, 0.95], CD0: [0.008, 0.12] };
       for (let i = 0; i < 400; i++) {
         window.__app.loadPreset(Object.keys(PRESETS)[i % 5]);
-        Object.entries(lim).forEach(([k, [a, b]]) => { if (rnd() < 0.5) window.__app.setInput(k, k === 'W' || k === 'S' || k === 'Fmax' || k === 'Pmax' ? a * Math.pow(b / a, rnd()) : a + rnd() * (b - a)); });
+        Object.entries(lim).forEach(([k, [a, b]]) => { if (rnd() < 0.5) window.__app.setInput(k, ['W', 'S', 'Fmax', 'Pmax', 'WL'].includes(k) ? a * Math.pow(b / a, rnd()) : a + rnd() * (b - a)); });
         if (rnd() < 0.3) window.__app.st.prop = 'jet';
         const r = model(window.__app.st), p = r.pr;
         const pts = [p.A, p.B, p.C, p.D];
@@ -258,6 +263,11 @@ const tests = {
         if (!(p.B.R <= p.C.R + 1e-9 && p.C.R <= p.D.R + 1e-9)) bad.push(`range order ${p.B.R.toFixed(1)}, ${p.C.R.toFixed(1)}, ${p.D.R.toFixed(1)} at ${i}`);
         if (!(p.A.P >= p.B.P - 1e-9 && p.B.P >= p.C.P - 1e-9 && p.C.P >= p.D.P - 1e-9)) bad.push('payload order at ' + i);
         if (r.U > 0 && pts.some(x => x.T > window.__app.st.W + 1e-6)) bad.push('over max takeoff weight at ' + i);
+        if (r.U > 0 && pts.some(x => x.P > 0 && x.w2 > window.__app.st.WL + 0.05)) bad.push('lands above max landing weight at ' + i);
+        // fuel and distance bookkeeping must close exactly for every flyable point
+        pts.forEach((x, j) => { if (x.Fcr > 0) {
+          if (Math.abs(x.F - (x.Ft + x.Fcl + x.Fde + x.Fr + x.Fcr)) > 1e-6) bad.push(`fuel does not add up at ${i}/${j}`);
+          if (Math.abs(x.R - (x.Xc + x.Rcr + x.Xd)) > 1e-9) bad.push(`distance does not add up at ${i}/${j}`); } });
       }
       return bad;
     });
@@ -295,11 +305,63 @@ const tests = {
     const s = await state(page), box = await page.inputValue('#n_W');
     return { pass: mid === '2550' && s.st.W === 2550 && box === '2550', detail: `box after preset change ${mid}; after blur W ${s.st.W}, box ${box}` };
   },
+  // ---------- new in REVD ----------
+  // With compressibility out of the way, best-range speed is the textbook answer: Vmd for a prop, 3^¼·Vmd for a jet (Vmd at the search weight).
+  async bestRangeTextbook(page) {
+    const res = await page.evaluate(() => ['skyvan', 'c172', 'kingair350', 'atr72', 'b737'].flatMap(id => ['prop', 'jet'].map(prop => {
+      const p = Object.assign({}, PRESETS[id], { prop, Mcrit: 5 }), r = model(p), VmdW0 = r.Vmd * Math.sqrt(1 - p.ft);
+      const want = prop === 'prop' ? VmdW0 : Math.pow(3, 0.25) * VmdW0, lo = Math.max(40, 1.1 * r.Vs);
+      return { id: id + '/' + prop, got: r.Vbest, want, skip: want < lo || want > 500 };
+    })));
+    const checked = res.filter(x => !x.skip), bad = checked.filter(x => Math.abs(x.got - x.want) > 0.05);
+    return { pass: bad.length === 0 && checked.length >= 8, detail: `${checked.length} cases, worst ${Math.max(...checked.map(x => Math.abs(x.got - x.want))).toFixed(4)} kt` + (bad.length ? ': ' + JSON.stringify(bad[0]) : '') };
+  },
+  // The button flies the best-range speed, and that never shortens ferry range.
+  async bestRangeButton(page) {
+    const out = [];
+    for (const id of ['skyvan', 'kingair350', 'atr72', 'b737']) {
+      await page.evaluate(id => window.__app.loadPreset(id), id);
+      const a = await state(page);
+      await page.click('#btnBest');
+      const b = await state(page), disabled = await page.$eval('#btnBest', x => x.disabled);
+      out.push({ id, V: `${a.st.V}→${b.st.V}`, ferry: `${a.r.RD.toFixed(0)}→${b.r.RD.toFixed(0)}`, ok: b.st.V === Math.round(a.r.Vbest) && disabled && b.r.RD >= a.r.RD - 1e-6 });
+    }
+    return { pass: out.every(x => x.ok), detail: out.map(x => `${x.id} V ${x.V} kt, ferry ${x.ferry} nmi`).join('; ') };
+  },
+  // Compressibility appears only above the critical Mach, shows on the chart and math, and warns past divergence.
+  async compressibility(page) {
+    await page.evaluate(() => window.__app.loadPreset('b737'));
+    const a = await state(page), lgA = await page.$eval('#lgDc', x => !x.hidden);
+    await set(page, [['V', 300]]);
+    const b = await state(page), warn = await page.textContent('#prWarn'), lgB = await page.$eval('#lgDc', x => !x.hidden);
+    await page.evaluate(() => window.__app.loadPreset('skyvan'));
+    const c = await state(page);
+    const ok = a.r.Dc > 0 && b.r.Dc > 5 * a.r.Dc && b.r.M > a.r.M && warn.includes('drag divergence') && lgA && lgB && c.r.Dc === 0;
+    return { pass: ok, detail: `737 at 250 kt: Mach ${a.r.M.toFixed(3)}, ${a.r.Dc.toFixed(0)} lb; at 300 kt: Mach ${b.r.M.toFixed(3)}, ${b.r.Dc.toFixed(0)} lb, warning shown ${warn.includes('drag divergence')}; Skyvan ${c.r.Dc} lb` };
+  },
+  // The landing-weight limit caps payload, is reported, and every corner then lands at or below it.
+  async landingWeightLimit(page) {
+    await page.evaluate(() => window.__app.loadPreset('atr72'));
+    await set(page, [['WL', 44000]]);
+    const s = await state(page), warn = await page.textContent('#prWarn');
+    const landed = ['A', 'B', 'C'].map(k => s.r.pr[k].w2);
+    const ok = s.r.Pstar < s.st.Pmax && Math.abs(s.r.pr.B.P - s.r.Pstar) < 1e-6 && landed.every(w => w <= 44000 + 0.05) && warn.includes('landing weight') && Math.abs(landed[0] - 44000) < 0.05;
+    return { pass: ok, detail: `payload capped ${s.st.Pmax} → ${s.r.Pstar.toFixed(0)} lb; landing weights A/B/C ${landed.map(w => w.toFixed(1)).join(', ')} lb; warning ${warn.includes('landing weight')}` };
+  },
+  // Climb and descent: no segments at sea level or with zero climb rate; more climb rate means less climb fuel for a given altitude.
+  async climbDescentSegments(page) {
+    const r = await page.evaluate(() => {
+      const base = PRESETS.skyvan, f = o => model(Object.assign({}, base, o)).pr.C;
+      return { sea: f({ h: 0 }), zero: f({ roc: 0 }), slow: f({ roc: 500 }), fast: f({ roc: 2000 }) };
+    });
+    const ok = r.sea.Fcl === 0 && r.sea.Xc === 0 && r.sea.Fde === 0 && r.zero.Fcl === 0 && r.zero.Fde > 0 && r.slow.Fcl > r.fast.Fcl && r.slow.Xc > r.fast.Xc;
+    return { pass: ok, detail: `Skyvan full tanks: sea level climb ${r.sea.Fcl} lb; climb at 500 vs 2,000 ft/min: ${r.slow.Fcl.toFixed(0)} vs ${r.fast.Fcl.toFixed(0)} lb, ${r.slow.Xc.toFixed(0)} vs ${r.fast.Xc.toFixed(0)} nmi` };
+  },
   // Random walks over the full new ranges never put NaN on screen or throw.
   async noNaNAnywhere(page) {
     const res = await page.evaluate(() => {
       let seed = 99; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; const bad = [];
-      const ids = ['W', 'S', 'V', 'Vs', 'CLmax', 'AR', 'h', 'CD0', 'e', 'We', 'ws', 'cp', 'eta', 'ct', 'Fmax', 'Pmax', 'tr', 'fc', 'U', 'D', 'n'];
+      const ids = ['W', 'S', 'V', 'Vs', 'CLmax', 'AR', 'h', 'CD0', 'e', 'Mcrit', 'We', 'ws', 'cp', 'eta', 'ct', 'Fmax', 'Pmax', 'WL', 'tr', 'ft', 'roc', 'U', 'D', 'n'];
       for (let i = 0; i < 300; i++) {
         const id = ids[Math.floor(rnd() * ids.length)], R = { U: [-5e4, 5e5], D: [10, 1e5], n: [1, 6] }[id];
         const inp = document.getElementById('n_' + id);

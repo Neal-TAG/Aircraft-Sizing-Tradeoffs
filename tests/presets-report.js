@@ -26,6 +26,11 @@ const PUBLISHED = {
     console.log(`\n${id}: stall ${cmp('Vs')} kt, TAS ${cmp('VTAS')} kt, empty ${r.We.toFixed(0)} lb, useful ${r.U.toFixed(0)} lb, L/D ${r.LD.toFixed(1)}, fuel flow ${r.ff0.toFixed(0)} lb/h`);
     console.log(`  B: ${r.PB.toFixed(0)} lb, ${cmp('RB')} nmi | C: ${r.PC.toFixed(0)} lb, ${cmp('RC')} nmi | D: ${cmp('RD')} nmi`);
     if (pub.note) console.log('  published: ' + pub.note);
+    const x = await p.evaluate(() => { const r = window.__last, C = r.pr.C; window.document.getElementById('btnBest').click(); const b = window.__last;
+      return { tc: C.tc, Fcl: C.Fcl, Xc: C.Xc, Fde: C.Fde, Xd: C.Xd, Mach: r.M, Dc: r.Dc, Pstar: r.Pstar, Vbest: r.Vbest, RCb: b.RC, RDb: b.RD, RBb: b.RB }; });
+    console.log(`  climb (full tanks) ${x.tc.toFixed(1)} min, ${x.Fcl.toFixed(0)} lb, ${x.Xc.toFixed(0)} nmi; descent ${x.Fde.toFixed(0)} lb, ${x.Xd.toFixed(0)} nmi; Mach ${x.Mach.toFixed(3)}, compressibility ${x.Dc.toFixed(0)} lb; payload limit ${x.Pstar.toFixed(0)} lb`);
+    console.log(`  at best-range speed ${x.Vbest.toFixed(0)} kt EAS: B ${x.RBb.toFixed(0)}, C ${x.RCb.toFixed(0)}, D ${x.RDb.toFixed(0)} nmi`);
+    if (id === 'c172') console.log('  published climb to 8,000 ft at 2,550 lb (POH Fig 5-7): 14 min, 18 lb, 19 nmi (climbs at 74 KIAS, slower than the model\'s cruise EAS)');
   }
   console.log(errors.length ? '\nPAGE ERRORS: ' + errors.join(' | ') : '\nNo page errors.');
   await b.close();
