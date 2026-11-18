@@ -42,6 +42,29 @@ const axisVal = (s, id) => (id === 'V' || id === 'W') ? s.st[id] : s.r[id];
 const relStep = (id, v) => id === 'V' ? 1 : Math.pow(10, Math.floor(Math.log10(v)) - 3); // V is linear step 1; W and S round to 4 significant figures
 
 const tests = {
+  // ---------- REVE layout: every control docked beside the results ----------
+  async layoutKeepsResultsInView(page) {
+    // every slider and number box lives in the control rail
+    const placement = await page.evaluate(() => { const ids = [...document.querySelectorAll('input[type=range]')].map(i => i.id);
+      return { n: ids.length, outside: ids.filter(id => !document.getElementById(id).closest('.rail')) }; });
+    // after scrolling to the bottom, the rail's fuel slider and the strip are both still on screen
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(50);
+    const geo = await page.evaluate(() => { const vis = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.height > 0; };
+      const fuel = document.getElementById('s_Fmax'); fuel.scrollIntoView({ block: 'nearest' });
+      return { scrolled: scrollY > 1000, strip: vis(document.getElementById('strip')), stripTop: Math.round(document.getElementById('strip').getBoundingClientRect().top), fuel: vis(fuel) }; });
+    // the strip follows the model: full-tanks range and its change against the reference
+    const read = () => page.evaluate(() => { const ro = [...document.querySelectorAll('#strip .ro')].find(e => e.querySelector('.k').textContent === 'Range, full tanks');
+      return { n: ro.querySelector('.n').firstChild.textContent, d: ro.querySelector('.d').textContent, cls: ro.querySelector('.d').className, RC: window.__last.RC }; });
+    const a = await read();
+    await set(page, [['Fmax', 3000]]);
+    const b = await read();
+    const fmt = x => Math.round(x).toLocaleString('en-US');
+    const ok = placement.outside.length === 0 && placement.n >= 20 && geo.scrolled && geo.strip && geo.stripTop >= 0 && geo.stripTop <= 12 && geo.fuel &&
+      a.n === fmt(a.RC) && a.d === '±0%' && b.n === fmt(b.RC) && b.RC > a.RC && /^\+/.test(b.d) && / up$/.test(b.cls);
+    return { pass: ok, detail: `${placement.n} sliders, ${placement.outside.length} outside the rail; at the bottom: strip on screen ${geo.strip} (top ${geo.stripTop} px), fuel slider on screen ${geo.fuel}; strip range ${a.n} (${a.d}) → ${b.n} (${b.d})` };
+  },
+
   // ---------- carried over from REVB ----------
   async escCancels(page) {
     await page.click('#n_W', { clickCount: 3 });

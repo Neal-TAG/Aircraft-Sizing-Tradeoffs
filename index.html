@@ -10,41 +10,47 @@
 <style>
 /* layout idea: instrument panel. radar left, controls right, then payload-range, drag, the map of dependencies, the sensitivity grid and the worked math */
 :root{
-  --bg:#f3f5f4; --panel:#ffffff; --ink:#16211e; --muted:#5d6b67; --line:#d5dcd9; --grid:#e3e8e6;
-  --accent:#0d8a63; --accent-soft:rgba(13,138,99,.18); --accent-fill:#d6ede4; --pin:#7a55c7; --pin-fill:#e9e2f7;
-  --good:#0d7a4f; --bad:#b5402f; --warn:#a36a00;
+  --bg:#edf1f4; --panel:#ffffff; --ink:#0f1d2b; --muted:#566778; --line:#d3dce4; --grid:#e5ebf0;
+  --accent:#0b8468; --accent-soft:rgba(11,132,104,.16); --accent-fill:#d4ece4; --pin:#7a55c7; --pin-fill:#e9e2f7;
+  --good:#0b7a50; --bad:#b5402f; --warn:#9a6200;
+  /* the control rail: a dark instrument panel beside a light drafting surface */
+  --rail:#0f1e2e; --rail-2:#152a3e; --rail-ink:#e3ebf2; --rail-muted:#8fa3b6; --rail-line:#24394e; --rail-field:#0a1623; --rail-accent:#4fd1a5;
   --f-display:"Barlow Semi Condensed","Arial Narrow",sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#0f1513; --panel:#171f1c; --ink:#e6ecea; --muted:#93a19c; --line:#2b3632; --grid:#222c29;
-  --accent:#3ecf9a; --accent-soft:rgba(62,207,154,.22); --accent-fill:#1c4034; --pin:#b79cf2; --pin-fill:#2e2545;
-  --good:#58d6a3; --bad:#f08a78; --warn:#e6b450; color-scheme:dark; } }
+  --bg:#0e1822; --panel:#142130; --ink:#e4ebf1; --muted:#8fa0b0; --line:#263443; --grid:#1d2935;
+  --accent:#3ecf9a; --accent-soft:rgba(62,207,154,.2); --accent-fill:#173a31; --pin:#b79cf2; --pin-fill:#2e2545;
+  --good:#58d6a3; --bad:#f08a78; --warn:#e6b450;
+  --rail:#070e17; --rail-2:#0f1b28; --rail-ink:#e3ebf2; --rail-muted:#8597a9; --rail-line:#22364a; --rail-field:#050b12; --rail-accent:#4fd1a5; color-scheme:dark; } }
 :root[data-theme="dark"]{
-  --bg:#0f1513; --panel:#171f1c; --ink:#e6ecea; --muted:#93a19c; --line:#2b3632; --grid:#222c29;
-  --accent:#3ecf9a; --accent-soft:rgba(62,207,154,.22); --accent-fill:#1c4034; --pin:#b79cf2; --pin-fill:#2e2545;
-  --good:#58d6a3; --bad:#f08a78; --warn:#e6b450; color-scheme:dark; }
+  --bg:#0e1822; --panel:#142130; --ink:#e4ebf1; --muted:#8fa0b0; --line:#263443; --grid:#1d2935;
+  --accent:#3ecf9a; --accent-soft:rgba(62,207,154,.2); --accent-fill:#173a31; --pin:#b79cf2; --pin-fill:#2e2545;
+  --good:#58d6a3; --bad:#f08a78; --warn:#e6b450;
+  --rail:#070e17; --rail-2:#0f1b28; --rail-ink:#e3ebf2; --rail-muted:#8597a9; --rail-line:#22364a; --rail-field:#050b12; --rail-accent:#4fd1a5; color-scheme:dark; }
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
-.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
-h1{font-family:var(--f-display);font-weight:600;font-size:30px;line-height:1.1;margin:0;text-wrap:balance}
-h2{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0 0 4px;text-wrap:balance}
+.shell{display:grid;grid-template-columns:372px minmax(0,1fr);min-height:100vh}
+.main{min-width:0;padding:28px 32px 56px;display:flex;flex-direction:column;gap:18px;max-width:1240px;width:100%;margin:0 auto}
+h1{font-family:var(--f-display);font-weight:600;font-size:40px;line-height:1.02;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:600;font-size:23px;line-height:1.15;margin:0 0 6px;text-wrap:balance}
 h3{font-family:var(--f-display);font-weight:600;font-size:16px;margin:4px 0 0;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 p{margin:0}
 .sub{color:var(--muted);max-width:68ch}
 .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
-.bar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.head{display:flex;flex-direction:column;gap:8px;padding-bottom:4px}
+.head .sub{font-size:15.5px}
 .btn:focus-visible,input:focus-visible,select:focus-visible,.seg button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer}
 select.btn{padding:7px 8px;max-width:100%}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
 .seg button{font:inherit;font-weight:500;border:0;background:transparent;color:var(--muted);padding:6px 14px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
-.top{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
-.pr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:16px 24px;margin-top:8px}
-@media (max-width:900px){.top,.pr{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:22px 24px;box-shadow:0 1px 0 rgba(15,29,43,.04),0 12px 32px -22px rgba(15,29,43,.28)}
+.hero{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,1fr);gap:8px 32px;align-items:center;padding-bottom:18px}
+.hero .legend{justify-content:center;font-size:12.5px;gap:6px 14px}
+.pr{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(220px,1fr);gap:12px 32px;margin-top:12px;align-items:start}
+@media (max-width:1180px){.hero,.pr{grid-template-columns:1fr}}
 #radar{width:100%;height:auto;display:block;touch-action:none;user-select:none}
 #radar text{font-family:var(--f-body);fill:var(--ink)}
 #radar .ax-name{font-size:13px;font-weight:600}
@@ -131,55 +137,144 @@ svg.chart .bestmk{fill:var(--pin);stroke:var(--panel);stroke-width:1.5}
 .legend i.bm{width:10px;height:10px;border:0;background:var(--pin);transform:rotate(45deg)}
 .legend span[hidden]{display:none}
 .btn[aria-disabled="true"]{opacity:.6;cursor:default}
+/* control rail */
+.rail{position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;background:var(--rail);color:var(--rail-ink);border-right:1px solid var(--rail-line);padding:22px 22px 40px;scrollbar-width:thin;scrollbar-color:#35506b transparent}
+.brand{display:flex;align-items:center;gap:10px;padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid var(--rail-line)}
+.brand svg{width:30px;height:30px;flex:none}
+.brand b{font-family:var(--f-display);font-weight:600;font-size:19px;letter-spacing:.01em}
+.brand span{display:block;font-size:12.5px;color:var(--rail-muted);line-height:1.2}
+.rail .pick{display:flex;flex-direction:column;gap:8px}
+.rail .pick label{font-size:12.5px;color:var(--rail-muted)}
+.rail .btn{background:var(--rail-2);border-color:var(--rail-line);color:var(--rail-ink);border-radius:5px}
+.rail .btn:hover{border-color:var(--rail-muted)}
+.rail select.btn{font-family:var(--f-display);font-size:18px;font-weight:600;padding:8px 10px;width:100%}
+.rail .acts{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.rail .acts .btn{font-size:13px;padding:6px 8px}
+.railnote{font-size:12.5px;color:var(--rail-muted);margin:14px 0 4px;line-height:1.45}
+.grp{border-top:1px solid var(--rail-line);padding:0;margin-top:14px}
+.grp summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:14px 0 4px;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.01em;color:var(--rail-ink)}
+.grp summary::-webkit-details-marker{display:none}
+.grp summary::after{content:"";width:7px;height:7px;border-right:1.5px solid var(--rail-muted);border-bottom:1.5px solid var(--rail-muted);transform:rotate(45deg);margin-right:4px;transition:transform .15s}
+.grp:not([open]) summary::after{transform:rotate(-45deg)}
+.grp .ctl{margin-top:10px;gap:14px}
+.grp > .row{margin-top:10px}
+.rail .row label,.rail .row > span:first-child{font-weight:500;font-size:14px;color:var(--rail-ink)}
+.rail .row .v{font-size:14px}
+.rail .row .v input{background:var(--rail-field);border-color:var(--rail-line);color:var(--rail-ink);width:6.6em;border-radius:4px}
+.rail .row .v input:focus{outline-color:var(--rail-accent);border-color:var(--rail-accent)}
+.rail .row .v .u{color:var(--rail-muted);font-size:12px;min-width:3.4em}
+.rail .row input[type=range]{accent-color:var(--rail-accent);height:18px}
+.rail .row .hint{color:var(--rail-muted);font-size:12px;display:none}
+.rail .row:focus-within .hint{display:block}
+.rail .seg{background:var(--rail-field);border-color:var(--rail-line);border-radius:5px}
+.rail .seg button{color:var(--rail-muted);padding:5px 12px;font-size:13.5px}
+.rail .seg button[aria-pressed="true"]{background:var(--rail-accent);color:var(--rail)}
+.rail summary:focus-visible{outline-offset:-2px}
+.rail .btn:focus-visible,.rail input:focus-visible,.rail select:focus-visible,.rail .seg button:focus-visible,.rail summary:focus-visible{outline-color:var(--rail-accent)}
+
+/* pinned readout strip: the results that matter, always on screen */
+.strip{position:sticky;top:12px;z-index:5;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 -12px 0 var(--bg),0 12px 28px -18px rgba(15,29,43,.5)}
+.strip .ro{padding:10px 14px;border-left:1px solid var(--grid);min-width:0}
+.strip .ro:first-child{border-left:0}
+.strip .k{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .n{font-family:var(--f-mono);font-size:18px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.strip .n small{font-size:12px;color:var(--muted);font-weight:400;margin-left:3px}
+.strip .d{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.strip .d.up{color:var(--good)} .strip .d.dn{color:var(--bad)}
+
+/* design-point spec sheet beside the radar */
+.spec h2{margin-bottom:2px}
+.spec .sub{font-size:13.5px;margin-bottom:10px}
+.spec .tiles{display:block}
+.spec .tile{display:grid;grid-template-columns:1fr auto 6.5em;align-items:baseline;gap:0 14px;border:0;border-top:1px solid var(--grid);border-radius:0;padding:10px 0}
+.spec .tile:last-child{border-bottom:1px solid var(--grid)}
+.spec .tile .k{font-size:14px;color:var(--ink)} .spec .tile .n{font-size:15px;text-align:right}
+.spec .tile .d{text-align:right}
+#radar .ax-name.res{fill:var(--muted);font-style:italic}
+#prTiles .tile{border:0;border-left:2px solid var(--accent);border-radius:0;padding:4px 0 4px 12px}
+.prside{display:flex;flex-direction:column;gap:14px}
+.prside .tiles{grid-template-columns:1fr 1fr;gap:14px 12px}
+
+@media (max-width:1180px){.shell{grid-template-columns:330px minmax(0,1fr)} .main{padding:24px 22px 48px} .strip .ro{padding:8px 10px} .strip .n{font-size:15.5px}}
+@media (min-width:901px){html{scroll-padding-top:110px}}
+@media (max-width:900px){
+  /* one column: the results lead, then the controls, then the rest of the page */
+  .shell{grid-template-columns:minmax(0,1fr);gap:16px;padding:20px 16px 48px}
+  .main{display:contents}
+  .head{order:1} .strip{order:2} .hero{order:3} .rail{order:4} .main > :nth-child(n+4){order:5}
+  .rail{position:static;height:auto;border:0;border-radius:6px;margin:0 -4px;padding:18px 18px 24px}
+  .brand{display:none}
+  h1{font-size:31px}
+  .strip{position:static;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .strip .ro:nth-child(3n+1){border-left:0} .strip .ro:nth-child(n+4){border-top:1px solid var(--grid)} .strip .ro:nth-child(n+7){display:none}
+  .panel{padding:16px} .hero{padding:10px 8px 16px}
+  #radar .ax-name{font-size:17px} #radar .ax-val{font-size:16px} #radar .ax-d{font-size:15px} #radar .tick{font-size:13px}
+}
+@media (max-width:480px){.strip .n{font-size:14px} .strip .ro{padding:8px} .strip .n small{display:none}}
+@media (prefers-reduced-motion:reduce){.grp summary::after{transition:none}}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <div>
-    <h1>Aircraft sizing trade-offs</h1>
-    <p class="sub" id="subline"></p>
+<div class="shell">
+<aside class="rail" aria-label="Design inputs">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0b8468"/><polygon points="16,4.5 25.4,9 27.7,19.2 21.2,27.3 10.8,27.3 4.3,19.2 6.6,9" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.4" stroke-linejoin="round"/><polygon points="16,7.5 22.6,11.4 25,18.6 19,24 12.6,23.4 8.6,18 10.2,11.6" fill="#fff"/></svg>
+    <div><b>Sizing bench</b><span>Conceptual design trade-offs</span></div>
   </div>
-  <div class="bar">
-    <label for="preset" class="sub">Aircraft</label>
+  <div class="pick">
+    <label for="preset">Aircraft</label>
     <select id="preset" class="btn"></select>
-    <button type="button" class="btn" id="btnRef">Make this the reference</button>
-    <button type="button" class="btn" id="btnPin">Pin this point</button>
-    <button type="button" class="btn" id="btnReset">Reset</button>
+    <div class="acts">
+      <button type="button" class="btn" id="btnRef">Make reference</button>
+      <button type="button" class="btn" id="btnPin">Pin this point</button>
+      <button type="button" class="btn" id="btnReset">Reset</button>
+    </div>
   </div>
+  <p id="modeNote" class="railnote"></p>
+  <details class="grp" open><summary>Wing and weight</summary><div id="gWing" class="ctl"></div></details>
+  <details class="grp" open><summary>Cruise</summary><div id="gCruise" class="ctl"></div></details>
+  <details class="grp" open><summary>Engines and fuel</summary>
+    <div class="row"><span>Engines</span><span class="seg" role="group" aria-label="Propulsion type"><button type="button" id="bProp" aria-pressed="true">Propeller</button><button type="button" id="bJet" aria-pressed="false">Jet</button></span></div>
+    <div id="gEngine" class="ctl"></div></details>
+  <details class="grp" open><summary>Mission and limits</summary><div id="gMission" class="ctl"></div></details>
+  <details class="grp" id="constBox"><summary>Aircraft constants</summary>
+    <p class="railnote">Drag and empty-weight constants for this aircraft. Change them to model a different design, then use Make reference to compare against it.</p>
+    <div id="constSliders" class="ctl"></div></details>
+</aside>
+
+<main class="main">
+<header class="head">
+  <h1>Aircraft sizing trade-offs</h1>
+  <p class="sub" id="subline"></p>
 </header>
 
-<div class="top">
-  <section class="panel">
+<div class="strip" id="strip" aria-label="Key results against the reference"></div>
+
+<section class="panel hero">
+  <div>
     <svg id="radar" viewBox="0 0 600 520" role="img" aria-label="Radar chart of eight quantities as a percentage of the reference aircraft, on a log scale from 25% to 400%"></svg>
     <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Reference, 100%</span><span><i class="p"></i>Pinned point</span><span><i class="h"></i>Drag these</span><span><i class="d"></i>Result only</span></div>
-  </section>
-  <section class="panel ctl">
-    <p id="modeNote" class="sub"></p>
-    <div id="sliders" class="ctl"></div>
+  </div>
+  <div class="spec">
+    <h2>Design point</h2>
+    <p class="sub">Derived from the inputs. Changes are against the reference.</p>
     <div class="tiles" id="tiles"></div>
-    <details id="constBox">
-      <summary>Aircraft constants</summary>
-      <p class="sub" style="margin-top:6px">Drag and empty-weight constants for this aircraft. Change them to model a different design. Use "Make this the reference" to compare against your own aircraft.</p>
-      <div id="constSliders" class="ctl"></div>
-    </details>
-  </section>
-</div>
+  </div>
+</section>
 
 <section class="panel">
   <h2>Payload and range</h2>
-  <p class="sub">Range at constant altitude and constant equivalent airspeed, with fuel set aside for takeoff and climb and a timed reserve. The corners are: maximum payload; maximum payload with fuel up to maximum takeoff weight; full tanks with payload traded away; full tanks with no payload.</p>
+  <p class="sub">Range at constant altitude and constant equivalent airspeed, after taxi, climb and descent fuel and a timed reserve. The corners are: maximum payload; maximum payload with fuel up to maximum takeoff weight; full tanks with payload traded away; full tanks with no payload.</p>
   <div class="pr">
-    <div class="ctl">
-      <div class="row"><span style="font-weight:500">Engines</span><span class="seg" role="group" aria-label="Propulsion type"><button type="button" id="bProp" aria-pressed="true">Propeller</button><button type="button" id="bJet" aria-pressed="false">Jet</button></span></div>
-      <div id="prSliders" class="ctl"></div>
-    </div>
     <div>
       <svg id="prchart" class="chart" viewBox="0 0 640 340" role="img" aria-label="Payload against range"></svg>
       <div class="legend"><span><i></i>Current point</span><span><i class="b"></i>Reference</span></div>
       <p class="warnline" id="prWarn" aria-live="polite"></p>
-      <div class="tiles" id="prTiles" style="margin-top:8px"></div>
-      <p style="margin-top:10px"><button type="button" class="btn" id="btnBest">Fly at best-range speed</button> <span class="sub" id="bestNote"></span></p>
+    </div>
+    <div class="prside">
+      <div class="tiles" id="prTiles"></div>
+      <p><button type="button" class="btn" id="btnBest">Fly at best-range speed</button></p>
+      <p class="sub" id="bestNote" style="font-size:13px"></p>
     </div>
   </div>
 </section>
@@ -210,6 +305,7 @@ svg.chart .bestmk{fill:var(--pin);stroke:var(--panel);stroke-width:1.5}
 </section>
 
 <section class="panel notes" id="notes"></section>
+</main>
 </div>
 
 <script id="model">
@@ -345,7 +441,7 @@ function buildRadar(){var s=$("#radar"); s.textContent=""; var i;
   rEls.dots=[];rEls.lab=[];
   AX.forEach(function(a,i){var an=ang(i),lx=CX+(RR+16)*Math.cos(an),ly=CY+(RR+16)*Math.sin(an),c=Math.cos(an);
     var anchor=Math.abs(c)<0.2?"middle":(c>0?"start":"end"); var dy=Math.sin(an)<-0.5?-34:(Math.sin(an)>0.5?14:-12);
-    s.appendChild(el("text",{x:lx,y:ly+dy,"text-anchor":anchor,"class":"ax-name"},a.name));
+    s.appendChild(el("text",{x:lx,y:ly+dy,"text-anchor":anchor,"class":"ax-name"+(a.result?" res":"")},a.name));
     var t2=el("text",{x:lx,y:ly+dy+16,"text-anchor":anchor,"class":"ax-val"}), t3=el("text",{x:lx,y:ly+dy+31,"text-anchor":anchor,"class":"ax-d"});
     s.appendChild(t2);s.appendChild(t3); rEls.lab.push([t2,t3]);});
   AX.forEach(function(a,i){var c=a.result?el("circle",{r:5,"class":"dot","data-i":i}):el("circle",{r:9,"class":"handle","data-i":i,tabindex:"0",role:"slider","aria-label":a.name});
@@ -423,7 +519,7 @@ var SL={
  roc:{label:"Average climb rate",unit:"ft/min",dec:0,hint:"Climb to cruise altitude at the cruise equivalent airspeed. 0 leaves the climb out."},
  Mcrit:{label:"Critical Mach number",unit:"",dec:2,hint:"Above this, compressibility drag rises steeply (Lock's fourth-power law)."}
 };
-var GROUPS={sliders:["Vs","S","W","V","CLmax","AR","h"],constSliders:["CD0","e","Mcrit","We","ws"],prSliders:["cp","eta","ct","Fmax","Pmax","WL","tr","ft","roc"]};
+var GROUPS={gWing:["Vs","S","W","CLmax","AR"],gCruise:["V","h"],gEngine:["cp","eta","ct","Fmax"],gMission:["Pmax","WL","tr","ft","roc"],constSliders:["CD0","e","Mcrit","We","ws"]};
 var sEls={};
 function curVal(id,r){return id==="Vs"?r.Vs:id==="S"?r.S:id==="We"?r.We:st[id];}
 function toPos(id,v){var R=RANGE[id]; return R.log?1000*Math.log(Math.max(R.min,v)/R.min)/Math.log(R.max/R.min):v;}
@@ -456,12 +552,18 @@ function renderSliders(r){Object.keys(sEls).forEach(function(id){var e=sEls[id],
 $("#bProp").addEventListener("click",function(){st.prop="prop"; touched="W"; render();});
 $("#bJet").addEventListener("click",function(){st.prop="jet"; touched="W"; render();});
 
-function tileHTML(t){var d=t[3]>0?100*(t[2]/t[3]-1):NaN;return '<div class="tile"><div class="k">'+t[0]+'</div><div class="n">'+t[1]+'</div><div class="d">'+(isNaN(d)?"–":Math.abs(d)<0.05?"reference":pct(d))+'</div></div>';}
+function tileHTML(t){var d=t[3]>0?100*(t[2]/t[3]-1):NaN;return '<div class="tile"><div class="k">'+t[0]+'</div><div class="n">'+t[1]+'</div><div class="d">'+(isNaN(d)?"–":Math.abs(d)<0.05?"±0%":pct(d))+'</div></div>';}
 function renderTiles(r){var T=[["Wing loading",r.WS.toFixed(1)+" lb/ft²",r.WS,base0.WS],["Span",fmtA(r.b)+" ft",r.b,base0.b],["Empty weight",fmtA(r.We)+" lb",r.We,base0.We],
   ["Lift to drag at cruise",r.LD.toFixed(1),r.LD,base0.LD],["Best lift to drag",r.LDmax.toFixed(1),r.LDmax,base0.LDmax],["Minimum drag speed",fmt(r.Vmd)+" kt",r.Vmd,base0.Vmd],["True airspeed",fmt(r.VTAS)+" kt",r.VTAS,base0.VTAS],["Mach number",r.M.toFixed(3),r.M,base0.M]];
   $("#tiles").innerHTML=T.map(tileHTML).join("");
-  var P=[["Range, max payload",fmt(r.RB)+" nmi",r.RB,base0.RB],["Payload, full tanks",fmtA(r.PC)+" lb",r.PC,base0.PC],["Range, full tanks",fmt(r.RC)+" nmi",r.RC,base0.RC],["Ferry range",fmt(r.RD)+" nmi",r.RD,base0.RD],["Cruise fuel flow",fmtA(r.ff0)+" lb/h",r.ff0,base0.ff0],["Best-range speed",r.Vbest==null?"–":fmt(r.Vbest)+" kt EAS",r.Vbest==null?NaN:r.Vbest,base0.Vbest==null?NaN:base0.Vbest]];
+  /* the ranges and fuel flow sit in the pinned strip, so this panel shows what the strip doesn't */
+  var P=[["Payload, max",fmtA(r.pr.B.P)+" lb",r.pr.B.P,base0.pr.B.P],["Payload, full tanks",fmtA(r.PC)+" lb",r.PC,base0.PC],["Climb, full tanks",fmt(r.pr.C.tc,1)+" min",r.pr.C.tc,base0.pr.C.tc],["Best-range speed",r.Vbest==null?"–":fmt(r.Vbest)+" kt EAS",r.Vbest==null?NaN:r.Vbest,base0.Vbest==null?NaN:base0.Vbest]];
   $("#prTiles").innerHTML=P.map(tileHTML).join("");
+  /* pinned strip: value, unit and change against the reference, coloured by whether more is better */
+  var K=[["Range, full tanks",fmt(r.RC),"nmi",r.RC,base0.RC,1],["Range, max payload",fmt(r.RB),"nmi",r.RB,base0.RB,1],["Ferry range",fmt(r.RD),"nmi",r.RD,base0.RD,1],
+    ["Useful load",fmtA(r.U),"lb",r.U,base0.U,1],["Cruise drag",fmtA(r.D),"lb",r.D,base0.D,-1],["Fuel flow",fmtA(r.ff0),"lb/h",r.ff0,base0.ff0,-1],["Mach",r.M.toFixed(3),"",r.M,base0.M,0]];
+  $("#strip").innerHTML=K.map(function(k){var d=k[4]>0?100*(k[3]/k[4]-1):NaN, c=isNaN(d)||Math.abs(d)<0.05?"":k[5]*d>0?" up":k[5]*d<0?" dn":"";
+    return '<div class="ro"><div class="k">'+k[0]+'</div><div class="n">'+k[1]+(k[2]?'<small>'+k[2]+'</small>':'')+'</div><div class="d'+c+'">'+(isNaN(d)?"–":Math.abs(d)<0.05?"±0%":pct(d))+'</div></div>';}).join("");
   var w=[]; if(r.U<=0) w.push("Empty weight is at or above gross weight, so there is no useful load.");
   else {
     if(r.pr.B.F>0&&r.RB===0) w.push("At maximum payload, taxi, climb, descent and reserve fuel use all the fuel that fits.");
@@ -642,7 +744,7 @@ function renderMath(r){var W=st.W,V=st.V,f=fmtA,rows=[],B=r.pr.B,isProp=st.prop!
 function renderNotes(){
   var P=PRESETS[curPreset];
   $("#subline").textContent="Starts at the "+P.name+". Move one quantity and see how the physics moves the others. The dashed ring is the reference"+(REF.name!==P.name?": "+REF.name:"")+".";
-  $("#modeNote").textContent="Drag any handle or slider, or type a value and press Enter. Stall speed resizes the wing. Useful load changes the gross weight. Cruise drag and gust load factor change the cruise speed. Range is a result only.";
+  $("#modeNote").textContent="Drag a slider here or a handle on the radar, or type a value and press Enter. Stall speed resizes the wing; useful load sets the gross weight; drag and gust load set the cruise speed.";
   $("#notes").innerHTML=
    "<p><b>The core link.</b> Stall speed, weight, wing area and maximum lift coefficient are tied by one equation. Set three and the fourth follows. Stall speed goes with the square root of wing loading.</p>"+
    "<p><b>Drag.</b> Parasite drag goes with speed squared and wing area. Induced drag goes with weight squared and falls with speed squared and span squared. Their sum is lowest where the two are equal.</p>"+

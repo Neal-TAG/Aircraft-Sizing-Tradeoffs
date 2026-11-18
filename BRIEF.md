@@ -1,11 +1,11 @@
-﻿# Aircraft sizing trade-offs: project brief
+# Aircraft sizing trade-offs: project brief
 
 ## Purpose
 
 An interactive web page that shows how the main aircraft sizing quantities affect each other, from a light single to a narrow-body jet. Change one value and see how the physics moves the others, including a rough payload-range diagram. It is a teaching and early-trade tool, not a design tool.
 
 - Live pages: https://neal-tag.github.io/Aircraft-Sizing-Tradeoffs/ (public, serves `main`) and https://claude.ai/artifact/8i9AsJkd8AxCoPAtvNRe55 (private unless shared).
-- Reference implementation: `index.html` in this repository, currently REVD. Where the brief and the code disagree, the code is what shipped. See "Revision history".
+- Reference implementation: `index.html` in this repository, currently REVE. Where the brief and the code disagree, the code is what shipped. See "Revision history".
 - Format: one self-contained HTML file. No libraries. Inline SVG for all drawings. The only outside request is Google Fonts.
 - Starting point: the stock Short SC.7 Skyvan Series 3, powered. Four other presets: Cessna 172S, King Air 350, ATR 72-600 and Boeing 737-800 (values and sources in `docs/presets.md`).
 - Payload-range model: `docs/payload-range-spec.md`.
@@ -15,8 +15,8 @@ An interactive web page that shows how the main aircraft sizing quantities affec
 | Symbol | Value | Meaning |
 |---|---|---|
 | KT | 1.688 | ft/s per knot |
-| Ï | 0.002377 slug/ftÂ³ | Sea-level air density. Speeds that set drag and gust load are equivalent airspeed. |
-| g | 32.2 ft/sÂ² | Gravity |
+| ρ | 0.002377 slug/ft³ | Sea-level air density. Speeds that set drag and gust load are equivalent airspeed. |
+| g | 32.2 ft/s² | Gravity |
 | Ude | 50 ft/s | Gust velocity |
 
 Per-aircraft constants, editable under "Aircraft constants" and set by each preset:
@@ -27,7 +27,7 @@ Per-aircraft constants, editable under "Aircraft constants" and set by each pres
 | e | 0.72 | 0.5 to 1.0 | Span efficiency |
 | M_crit | 0.65 | 0.5 to 0.95 | Critical Mach number for compressibility drag |
 | fe | 0.4085 | 0 to 0.95 | Empty weight fraction of gross weight. Set by typing an empty weight. |
-| ws | 6 lb/ftÂ² | 0 to 30 | Empty weight added per square foot of wing |
+| ws | 6 lb/ft² | 0 to 30 | Empty weight added per square foot of wing |
 
 ## Inputs, defaults and ranges
 
@@ -36,15 +36,15 @@ Log sliders move by ratio and round to 4 significant figures. Linear sliders rou
 | Input | Skyvan default | Range | Step | Notes |
 |---|---|---|---|---|
 | Gross weight W | 12,500 lb | 500 to 1,300,000 | log | Maximum takeoff weight |
-| Wing area S | 373 ftÂ² | 30 to 10,000 | log | |
+| Wing area S | 373 ft² | 30 to 10,000 | log | |
 | Cruise speed V | 127 kt | 40 to 500 | 1 | Equivalent airspeed. 148 kt true at 10,000 ft. |
 | Maximum lift coefficient CLmax | 2.75 | 0.8 to 4.0 | 0.05 | Landing configuration. From the published 60 kt stall at 12,500 lb. |
-| Aspect ratio AR | 11.3 | 3 to 40 | 0.1 | 64.9 ft spanÂ² Ã· 373 ftÂ² |
+| Aspect ratio AR | 11.3 | 3 to 40 | 0.1 | 64.9 ft span² ÷ 373 ft² |
 | Cruise altitude h | 10,000 ft | 0 to 51,000 | 500 | ISA. Sets true airspeed. |
 | Stall speed Vs | result, 60.0 kt | 25 to 200 | 0.5 | Setting it resizes the wing |
 | Engines | propeller | propeller or jet | | Chooses the fuel-flow law |
 | BSFC c_p (prop) | 0.60 lb/hp/h | 0.25 to 1.2 | 0.01 | Estimate |
-| Propeller efficiency Î· (prop) | 0.80 | 0.4 to 0.95 | 0.01 | |
+| Propeller efficiency η (prop) | 0.80 | 0.4 to 0.95 | 0.01 | |
 | TSFC c_t (jet) | 0.60 lb/lbf/h | 0.3 to 1.5 | 0.01 | |
 | Maximum fuel | 2,262 lb | 10 to 400,000 | log | EASA type certificate |
 | Maximum payload | 4,600 lb | 10 to 300,000 | log | Cabin limit. Crew counts as payload. |
@@ -57,45 +57,45 @@ Log sliders move by ratio and round to 4 significant figures. Linear sliders rou
 
 Sizing (unchanged since REVA, and bit-identical to REVB for the same inputs):
 
-Lift-curve slope (per radian): CLa = 2Ï€Â·AR Ã· (2 + âˆš(4 + ARÂ² Ã· 0.9025))
+Lift-curve slope (per radian): CLa = 2π·AR ÷ (2 + √(4 + AR² ÷ 0.9025))
 
 Geometry and loading:
-- q = Â½ Ï (VÂ·KT)Â²
-- b = âˆš(ARÂ·S) (span, ft)
-- c = S Ã· b (mean chord, ft)
-- W/S = W Ã· S
+- q = ½ ρ (V·KT)²
+- b = √(AR·S) (span, ft)
+- c = S ÷ b (mean chord, ft)
+- W/S = W ÷ S
 
 Stall:
-- Vs = âˆš(2W Ã· (ÏÂ·SÂ·CLmax)) Ã· KT (knots)
-- Inverse, used when stall speed is set: S = 2W Ã· (ÏÂ·(VsÂ·KT)Â²Â·CLmax)
+- Vs = √(2W ÷ (ρ·S·CLmax)) ÷ KT (knots)
+- Inverse, used when stall speed is set: S = 2W ÷ (ρ·(Vs·KT)²·CLmax)
 - The powered stall is carried entirely by CLmax. Slipstream and thrust are not modelled separately.
 
 Gust load factor (FAR 23 style):
-- Î¼ = 2(W/S) Ã· (ÏÂ·cÂ·CLaÂ·g)
-- Kg = 0.88Î¼ Ã· (5.3 + Î¼)
-- n = 1 + KgÂ·UdeÂ·VÂ·CLa Ã· (498Â·W/S), with V in knots equivalent airspeed
+- μ = 2(W/S) ÷ (ρ·c·CLa·g)
+- Kg = 0.88μ ÷ (5.3 + μ)
+- n = 1 + Kg·Ude·V·CLa ÷ (498·W/S), with V in knots equivalent airspeed
 
 Drag:
-- Dp = qÂ·SÂ·CD0 (parasite)
-- Di = WÂ² Ã· (qÂ·Ï€Â·bÂ²Â·e) (induced)
+- Dp = q·S·CD0 (parasite)
+- Di = W² ÷ (q·π·b²·e) (induced)
 - D = Dp + Di
-- L/D at cruise = W Ã· D
-- K = 1 Ã· (Ï€Â·ARÂ·e)
-- Best L/D = 0.5 Ã· âˆš(CD0Â·K)
-- Minimum drag speed Vmd = âˆš(2(W/S) Ã· Ï Â· âˆš(K Ã· CD0)) Ã· KT
+- L/D at cruise = W ÷ D
+- K = 1 ÷ (π·AR·e)
+- Best L/D = 0.5 ÷ √(CD0·K)
+- Minimum drag speed Vmd = √(2(W/S) ÷ ρ · √(K ÷ CD0)) ÷ KT
 
 Weight:
-- Empty weight We = feÂ·W + wsÂ·S
-- Useful load U = W âˆ’ We (payload plus fuel). REVA and REVB called this "payload", which was wrong once fuel is modelled.
+- Empty weight We = fe·W + ws·S
+- Useful load U = W − We (payload plus fuel). REVA and REVB called this "payload", which was wrong once fuel is modelled.
 
 Altitude, fuel flow and range: see `docs/payload-range-spec.md` (version 2). In short:
-- Atmosphere: Ïƒ and Î¸ from ISA. V_true = V Ã· âˆšÏƒ. Mach = V_true Ã· (661.48Â·âˆšÎ¸).
-- Compressibility: Î”CD = 20Â·(M âˆ’ M_crit)â´ above M_crit (Lock's law). Cruise drag D = Dp + Dc + Di, and L/D at cruise uses this D.
-- At the cruise EAS, D(w) = kâ‚€ + kâ‚‚wÂ². Fuel flow is c_pÂ·DÂ·V_trueÂ·KT Ã· (550Î·) for a prop, or c_tÂ·D for a jet.
+- Atmosphere: σ and θ from ISA. V_true = V ÷ √σ. Mach = V_true ÷ (661.48·√θ).
+- Compressibility: ΔCD = 20·(M − M_crit)⁴ above M_crit (Lock's law). Cruise drag D = Dp + Dc + Di, and L/D at cruise uses this D.
+- At the cruise EAS, D(w) = k₀ + k₂w². Fuel flow is c_p·D·V_true·KT ÷ (550η) for a prop, or c_t·D for a jet.
 - Mission: taxi and takeoff, a climb at the cruise EAS (power or thrust for drag plus climbing), a cruise using the exact constant-altitude, constant-speed integral, an idle glide descent at 10% of cruise fuel flow, and a timed reserve. Range = climb + cruise + descent distance.
 - Payload is capped by maximum payload and by maximum landing weight (landing with the reserve).
 - The corner points are: A, maximum payload at zero range; B, maximum payload with fuel up to maximum takeoff weight; C, full tanks; D, full tanks with no payload.
-- Best-range speed: the EAS of least drag (prop) or most true airspeed per unit drag (jet), including compressibility, at WÂ·(1 âˆ’ taxi).
+- Best-range speed: the EAS of least drag (prop) or most true airspeed per unit drag (jet), including compressibility, at W·(1 − taxi).
 
 ## Values at the Skyvan defaults
 
@@ -103,7 +103,7 @@ Altitude, fuel flow and range: see `docs/payload-range-spec.md` (version 2). In 
 |---|---|
 | Stall speed | 60.0 kt |
 | Span | 64.9 ft |
-| Wing loading | 33.5 lb/ftÂ² |
+| Wing loading | 33.5 lb/ft² |
 | Empty weight | 7,344 lb |
 | Useful load | 5,156 lb |
 | Cruise drag | 1,115 lb (parasite 815, induced 300) |
@@ -118,20 +118,40 @@ Altitude, fuel flow and range: see `docs/payload-range-spec.md` (version 2). In 
 
 ## Page layout
 
-1. **Header:** title, a subtitle naming the preset and reference, an aircraft preset menu, and "Make this the reference", "Pin this point" and "Reset" buttons.
-2. **Radar chart (left):** eight axes on a log scale from 25% of the reference (centre) to 400% (rim). The dashed ring is the reference (the preset, or your own point after "Make this the reference"). The filled shape is the current point, and a dotted outline shows a pinned point.
-   - Axes in order: cruise speed (EAS), gross weight, useful load, cruise drag, gust load factor, wing area, stall speed, range with full tanks. The first seven are draggable handles; range is a result only (a small dot).
-   - Labels show the value and the % change from the reference. Green means better, red means worse; speed, weight and wing area stay neutral. "Off scale" marks values outside 25 to 400%.
-3. **Controls (right):** a slider and typed box for stall speed, wing area, gross weight, cruise speed, CLmax, aspect ratio and cruise altitude. Eight tiles: wing loading, span, empty weight, cruise L/D, best L/D, minimum drag speed, true airspeed and Mach number. A collapsible "Aircraft constants" block holds CD0, span efficiency, critical Mach, empty weight and empty weight per ftÂ² of wing.
-4. **Payload and range:**
-   - Left: a propeller/jet switch and the fuel inputs. BSFC and propeller efficiency show for props; TSFC shows for jets.
-   - Right: the payload-range diagram with the reference dashed and points B, C and D labelled, a warning line, six tiles (range at max payload, payload with full tanks, range with full tanks, ferry range, cruise fuel flow, best-range speed), and a "Fly at best-range speed" button. The fuel inputs include maximum landing weight, taxi fuel and average climb rate.
-   - The warning line covers no useful load, a maximum-payload mission with no usable cruise fuel, and cruise speed below stall.
-5. **Drag against speed:** parasite, induced and total drag against equivalent airspeed. Both axes rescale to the current aircraft with round-number ticks. Shows the stall line, minimum drag point, cruise point and the reference total drag dashed.
-6. **How the quantities connect:** the 16-box dependency map, unchanged except that "Payload" is now "Useful load".
-7. **Influence table:** % change in each result for a 1% increase in wing area, gross weight, cruise speed, CLmax or aspect ratio. The results are stall speed, useful load, parasite, induced and total drag, gust factor, range at max payload and ferry range. "â€“" means the result is zero or negative.
-8. **The math, with your numbers:** grouped rows (sizing; altitude and fuel flow; range at maximum payload, worked through point B).
-9. **Notes:** the core link, drag, range, the preset's sources, and assumptions.
+The page is a two-column workbench. Every input is in a docked control rail on the left; the results are on the right, with the key ones pinned in view.
+
+1. **Control rail (left, 372 px, dark):** stays in place while the results scroll, and scrolls on its own if it is taller than the window.
+   - The aircraft preset menu and the "Make reference", "Pin this point" and "Reset" buttons.
+   - A one-line note on how to drive the page.
+   - Collapsible groups, each a slider plus typed box per input:
+     - **Wing and weight:** stall speed, wing area, gross weight, CLmax and aspect ratio.
+     - **Cruise:** cruise speed (EAS) and altitude.
+     - **Engines and fuel:** the propeller/jet switch, BSFC and propeller efficiency (props) or TSFC (jets), and maximum fuel.
+     - **Mission and limits:** maximum payload, maximum landing weight, reserve, taxi fuel and climb rate.
+     - **Aircraft constants** (closed by default, id `constBox`): CD0, span efficiency, critical Mach, empty weight, and empty weight per ft² of wing.
+   - A control's hint shows while that control has focus.
+2. **Header (right):** title, and a subtitle naming the preset and reference.
+3. **Readout strip:** pinned 12 px below the top of the window while the results scroll. It has seven readouts: range with full tanks, range at max payload, ferry range, useful load, cruise drag, fuel flow and Mach. Each shows its value, unit and % change from the reference ("±0%" when unchanged). Green means better and red means worse; Mach stays neutral.
+4. **Design point:** the radar, with a spec sheet beside it.
+   - The radar has eight axes on a log scale, from 25% of the reference (centre) to 400% (rim). The dashed ring is the reference: the preset, or your own point after "Make reference". The filled shape is the current point, and a dotted outline shows a pinned point.
+     - Axes in order: cruise speed (EAS), gross weight, useful load, cruise drag, gust load factor, wing area, stall speed, range with full tanks.
+     - The first seven are draggable handles. Range is a result only: a small dot, with its name in muted italic.
+     - Labels show the value and the % change from the reference. Green means better, red means worse; speed, weight and wing area stay neutral. "Off scale" marks values outside 25 to 400%.
+   - The spec sheet has one row each for wing loading, span, empty weight, cruise L/D, best L/D, minimum drag speed, true airspeed and Mach number. Each row shows the value and the % change from the reference.
+5. **Payload and range:**
+   - Left: the payload-range diagram, with the reference dashed, points B, C and D labelled, and a warning line.
+   - Right: four readouts that aren't in the strip (max payload, payload with full tanks, climb time with full tanks, best-range speed) and the "Fly at best-range speed" button.
+   - The warning line covers:
+     - no useful load;
+     - a maximum-payload mission with no usable cruise fuel;
+     - payload capped by landing weight;
+     - cruise speed below stall;
+     - cruise well past drag divergence.
+6. **Drag against speed:** parasite, induced and total drag against equivalent airspeed. Both axes rescale to the current aircraft with round-number ticks. Shows the stall line, minimum drag point, cruise point and the reference total drag dashed.
+7. **How the quantities connect:** the 16-box dependency map, unchanged except that "Payload" is now "Useful load".
+8. **Influence table:** % change in each result for a 1% increase in wing area, gross weight, cruise speed, CLmax or aspect ratio. The results are stall speed, useful load, parasite, induced and total drag, gust factor, range at max payload and ferry range. "–" means the result is zero or negative.
+9. **The math, with your numbers:** grouped rows (sizing; altitude and fuel flow; range at maximum payload, worked through point B).
+10. **Notes:** the core link, drag, range, the preset's sources, and assumptions.
 
 ## Handles: what each one moves
 
@@ -139,28 +159,28 @@ Altitude, fuel flow and range: see `docs/payload-range-spec.md` (version 2). In 
 |---|---|
 | Wing area, gross weight, cruise speed | Set directly |
 | Stall speed | Wing area, from the inverse stall equation |
-| Useful load | Gross weight: W = (U + wsÂ·S) Ã· (1 âˆ’ fe) |
-| Gust load factor | Cruise speed, because n is linear in V: V = (n âˆ’ 1) Ã· k, with k = (n0 âˆ’ 1) Ã· V0 |
+| Useful load | Gross weight: W = (U + ws·S) ÷ (1 − fe) |
+| Gust load factor | Cruise speed, because n is linear in V: V = (n − 1) ÷ k, with k = (n0 − 1) ÷ V0 |
 | Cruise drag | Cruise speed, by bisection on the fast side of minimum drag. It stops at Vmd if the target is below minimum drag. If minimum drag is above 500 kt, it solves on the slow side instead. |
 
-Arrow keys step a handle by 1% of the reference value or of the current value, whichever is bigger, in the direction of the key. If rounding swallows the step, it grows (up to 10Ã—) until something moves. Dragging maps the pointer to the log scale.
+Arrow keys step a handle by 1% of the reference value or of the current value, whichever is bigger, in the direction of the key. If rounding swallows the step, it grows (up to 10×) until something moves. Dragging maps the pointer to the log scale.
 
 Typed values apply on Enter or when you click away; Esc cancels. All values clamp to their range.
 
 ## Dependency map
 
 16 boxes. Edges:
-- Stall: S â†’ Vs, W â†’ Vs, CLmax â†’ Vs
-- Speed: V â†’ q
-- Span: S â†’ b, AR â†’ b
-- Wing loading: S â†’ W/S, W â†’ W/S
-- Gust: W/S â†’ n, V â†’ n, AR â†’ n
-- Parasite drag: S â†’ Dp, q â†’ Dp
-- Induced drag: b â†’ Di, W â†’ Di, q â†’ Di
-- Drag: Dp â†’ D, Di â†’ D
-- Empty weight: S â†’ We, W â†’ We
-- Useful load: We â†’ U, W â†’ U
-- L/D: D â†’ L/D, W â†’ L/D
+- Stall: S → Vs, W → Vs, CLmax → Vs
+- Speed: V → q
+- Span: S → b, AR → b
+- Wing loading: S → W/S, W → W/S
+- Gust: W/S → n, V → n, AR → n
+- Parasite drag: S → Dp, q → Dp
+- Induced drag: b → Di, W → Di, q → Di
+- Drag: Dp → D, Di → D
+- Empty weight: S → We, W → We
+- Useful load: We → U, W → U
+- L/D: D → L/D, W → L/D
 
 Interaction: by default everything downstream of the last control touched is highlighted. Clicking a box shows its ancestors (purple) and descendants (green); click again or on empty space to clear. Boxes work with Tab and Enter.
 
@@ -170,18 +190,22 @@ The map doesn't yet show altitude, fuel or range.
 
 ### Look
 - Fonts (Google Fonts): Barlow Semi Condensed 500/600 for headings, IBM Plex Sans 400/500/600 for body text (15 px), IBM Plex Mono 400/500 for numbers.
-- Page is at most 1,180 px wide, with 16 px side padding. Panels have a 1 px border, a 12 px radius and 16 px padding.
-- Top row: radar and controls (1.15 : 1). The payload-range panel is controls and chart (1 : 1.6). Both stack below 900 px.
+- Layout: a 372 px sticky rail, then a main column of at most 1,240 px with 32 px side padding. Panels have a 1 px border, a 6 px radius, 22 × 24 px padding and a soft drop shadow.
+- The design-point panel is radar and spec sheet (1.45 : 1). The payload-range panel is chart and readouts (1.7 : 1). Both stack below 1,180 px.
+- The rail narrows to 330 px below 1,180 px.
+- Below 900 px the page is one column, ordered as header, strip, design point, then the rail, then the rest. Nothing is sticky, the strip shows six readouts in three columns, and the radar labels grow so they stay readable.
 - Tab icon: an inline SVG `data:` URL showing a white radar shape on the accent green.
-- Theme follows the system; `data-theme` on `<html>` overrides it. The colour tokens are as in REVB: bg, panel, ink, muted, line, grid, accent, accent-fill, pin, pin-fill, good, bad, warn.
+- Theme follows the system; `data-theme` on `<html>` overrides it. The colour tokens are:
+  - bg, panel, ink, muted, line, grid, accent, accent-soft, accent-fill, pin, pin-fill, good, bad, warn (REVE moved these to a cool slate palette);
+  - for the rail: rail, rail-2, rail-ink, rail-muted, rail-line, rail-field and rail-accent.
 
 ### Numbers
 - Values that span orders of magnitude are shown as whole numbers from 100 up, and to about 3 significant figures below that.
 - Chart ticks use 1-2-5 steps. Values from 10,000 up are shown as "12k".
 
 ### Charts
-- Drag chart: viewBox 900 Ã— 330, plot x 62 to 884. The speed axis runs to a round number at or above max(1.5 Ã— cruise, 1.9 Ã— Vmd, 1.4 Ã— Vs). The drag axis runs to a round number at or above max(2.2 Ã— minimum drag, 1.15 Ã— cruise drag).
-- Payload-range chart: viewBox 640 Ã— 340, plot x 62 to 620, y 18 to 296. Both axes cover the current and reference diagrams with a little headroom. Points B, C and D are dots. Labels give the range, and coinciding points share one label (for example "B=C").
+- Drag chart: viewBox 900 × 330, plot x 62 to 884. The speed axis runs to a round number at or above max(1.5 × cruise, 1.9 × Vmd, 1.4 × Vs). The drag axis runs to a round number at or above max(2.2 × minimum drag, 1.15 × cruise drag).
+- Payload-range chart: viewBox 640 × 340, plot x 62 to 620, y 18 to 296. Both axes cover the current and reference diagrams with a little headroom. Points B, C and D are dots. Labels give the range, and coinciding points share one label (for example "B=C").
 
 ### Presets and reference
 - Choosing a preset loads every input and makes it the reference.
@@ -196,6 +220,34 @@ The map doesn't yet show altitude, fuel or range.
 
 ## Revision history
 
+### REVE (from REVD)
+
+A layout rework. The model is unchanged.
+
+Before REVE:
+- The radar sat beside only the sizing controls.
+- The nine fuel and mission sliders were far down the page.
+- Range, which appears on the radar, changed while the radar was off screen.
+- The control column was twice the height of the radar, leaving a large empty space.
+
+Changed:
+- Every input moved to one docked rail, in five groups.
+- A pinned readout strip keeps range, useful load, drag, fuel flow and Mach in view from anywhere on the page.
+- The radar now sits beside a spec sheet of derived values.
+- The payload-range panel shows only the readouts the strip doesn't.
+- New palette and panel styling.
+- Hints appear on focus.
+- BRIEF.md's broken characters are fixed: text such as "ftÂ²" had been saved twice-encoded.
+
+Verified:
+- All earlier checks pass.
+- The sizing model is identical to REVB at 8,500 values.
+- A new check, `layoutKeepsResultsInView`, confirms that:
+  - all 21 sliders are in the rail;
+  - after scrolling to the bottom, the strip is at the top of the window and the fuel slider is still on screen;
+  - the strip's range follows the model, 770 → 1,090 nmi (+41%) for 3,000 lb of fuel.
+- The new check fails on REVD.
+
 ### REVD (from REVC)
 
 Added:
@@ -209,7 +261,7 @@ Added:
 
 Verified:
 - The page matches a separate implementation of spec version 2 on 12 cases (828 values).
-- Best-range speed reduces to the textbook results (Vmd for props, 3^Â¼Â·Vmd for jets) to 0.003 kt when compressibility is off.
+- Best-range speed reduces to the textbook results (Vmd for props, 3^¼·Vmd for jets) to 0.003 kt when compressibility is off.
 - For 400 random aircraft, fuel and distance add up exactly at every corner point, and no corner lands above maximum landing weight.
 - The sizing model is still bit-identical to REVB.
 - The Cessna climb gives 14.0 min and 19 lb, against the handbook's 14 min and 18 lb.
@@ -255,7 +307,7 @@ Verified:
 |---|---|
 | Esc in a number box didn't cancel | Esc restores the value before leaving the box |
 | Payload arrow keys ran backwards when negative, and stuck near zero | The step is based on the reference value and grows until something moves |
-| Influence table gave misleading colours for negative payload | Shows "â€“" |
+| Influence table gave misleading colours for negative payload | Shows "–" |
 | Reset left a map selection on screen | Reset clears it |
 | Radar handles gave screen readers no value | aria-valuenow and aria-valuetext added |
 

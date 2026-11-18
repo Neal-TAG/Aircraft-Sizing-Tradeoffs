@@ -10,10 +10,10 @@ It is a teaching and early-trade tool, not a design tool.
 
 Open `index.html` in a browser. It is one self-contained file with no build step; the only outside request is Google Fonts.
 
-- **Aircraft menu:** load a preset. "Make this the reference" compares against your own design instead.
-- **Radar chart:** drag any of the seven handles, or focus one and use the arrow keys. Log scale, 25% to 400% of the reference.
-- **Controls:** sliders and typed values. Enter applies, Esc cancels. Drag and empty-weight constants are under "Aircraft constants".
-- **Payload and range:** propeller or jet, fuel consumption, fuel and payload limits, reserve and climb allowance, with the diagram and its corner points.
+- **Control rail (left):** every input, grouped into wing and weight, cruise, engines and fuel, mission and limits, and aircraft constants. It stays in view while the results scroll. Sliders and typed values: Enter applies, Esc cancels. The aircraft menu loads a preset; "Make reference" compares against your own design instead.
+- **Readout strip:** range, useful load, drag, fuel flow and Mach against the reference, pinned to the top while you scroll.
+- **Radar chart:** drag any of the seven handles, or focus one and use the arrow keys. Log scale, 25% to 400% of the reference. Beside it, a spec sheet of derived values.
+- **Payload and range:** the diagram and its corner points, with a best-range speed button.
 - **Drag against speed:** parasite, induced and total drag, with the stall, minimum drag and cruise points marked.
 - **Dependency map:** click a box to see what affects it and what it affects.
 - **Influence table:** % change in each result for a 1% change in each input.
@@ -23,7 +23,7 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 | File | What it is |
 |---|---|
-| `index.html` | The page (REVD) |
+| `index.html` | The page (REVE) |
 | `BRIEF.md` | Full spec: equations, inputs and ranges, layout, behaviour, and revision history |
 | `docs/payload-range-spec.md` | Altitude, fuel-flow and payload-range math |
 | `docs/presets.md` | Preset values, sources, estimates, and model-versus-published comparison |
