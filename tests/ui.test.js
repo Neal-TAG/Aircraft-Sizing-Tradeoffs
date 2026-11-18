@@ -179,6 +179,26 @@ const tests = {
     if (!(g.r.Vs > f.r.Vs)) bad.push(`clean stall ArrowUp ${f.r.Vs.toFixed(2)} -> ${g.r.Vs.toFixed(2)}`);
     return { pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `clean stall ${b.r.Vs.toFixed(1)} kt, drag/gust/payload unchanged, solve and switch-back correct` };
   },
+  // Hold stall speed: with the switch on, more lift keeps the stall and shrinks the wing, which cuts cruise drag.
+  async holdStallSpeed(page) {
+    const bad = [];
+    const a = await state(page);
+    await set(page, [['CLmax', 3.0]]);
+    const off = await state(page);
+    if (!(off.r.Vs < a.r.Vs - 1 && off.r.S === a.r.S && off.r.D === a.r.D)) bad.push(`switch off: Vs ${off.r.Vs.toFixed(1)}, S ${off.r.S}, D ${off.r.D.toFixed(0)}`);
+    await page.click('#btnReset');
+    await page.check('#holdVs');
+    await set(page, [['CLmax', 3.0]]);
+    const on = await state(page);
+    if (Math.abs(on.r.Vs - a.r.Vs) > 0.1) bad.push(`switch on: stall moved to ${on.r.Vs.toFixed(2)}`);
+    if (on.r.S !== 342) bad.push(`switch on: wing ${on.r.S} ft² (want 342 = 373 × 2.75 ÷ 3.0)`);
+    if (!(on.r.D < a.r.D && on.r.Dp < a.r.Dp && on.r.Di > a.r.Di)) bad.push(`drag: total ${a.r.D.toFixed(0)} -> ${on.r.D.toFixed(0)}, parasite ${a.r.Dp.toFixed(0)} -> ${on.r.Dp.toFixed(0)}, induced ${a.r.Di.toFixed(0)} -> ${on.r.Di.toFixed(0)}`);
+    // in the clean phase the hold keeps the clean stall
+    await page.click('#btnReset'); await page.click('#phClean');
+    const c0 = await state(page); await set(page, [['CLmax', 1.8]]); const c1 = await state(page);
+    if (Math.abs(c1.r.Vs - c0.r.Vs) > 0.15 || c1.st.CLmax !== 2.75) bad.push(`clean hold: stall ${c0.r.Vs.toFixed(2)} -> ${c1.r.Vs.toFixed(2)}, flaps CL ${c1.st.CLmax}`);
+    return { pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `CL 3.0 held: wing 373 -> ${on.r.S} ft², stall ${on.r.Vs.toFixed(1)} kt, cruise drag ${a.r.D.toFixed(0)} -> ${on.r.D.toFixed(0)} lb (parasite ${a.r.Dp.toFixed(0)} -> ${on.r.Dp.toFixed(0)}, induced ${a.r.Di.toFixed(0)} -> ${on.r.Di.toFixed(0)})` };
+  },
   // Stock values from the brief.
   async stockValues(page) {
     const r = (await state(page)).r;

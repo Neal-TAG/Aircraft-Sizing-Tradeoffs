@@ -52,6 +52,7 @@ Stall:
 - Inverse, used when stall speed is set: S = 2W ÷ (ρ·(Vs·KT)²·CLmax)
 - The powered stall is carried entirely by CLmax. Slipstream and thrust are not modelled separately.
 - **Flight phase** (header switch, Flaps down or Clean, default Flaps down): picks which lift coefficient sets the stall speed, CLmax or CLc. Nothing else changes: drag, gusts and weights are the same in both phases. In Clean, the stall speed handle and slider size the wing for the clean stall, the lift coefficient control edits CLc, the radar's stall axis is measured against the stock clean stall (81.2 kt), and labels read "Clean stall". A line under the switch always shows both stall speeds. Flaps down renders exactly what the page did before the switch was added.
+- **Hold stall speed** (switch under the max lift slider, default off): off, a change in max lift keeps the wing and moves the stall. On, it keeps the selected phase's stall and resizes the wing, S = 2W ÷ (ρ·(Vs·KT)²·CL). At the stock Skyvan, CL 3.0 held gives 342 ft² and cruise drag 1,115 → 1,074 lb (parasite 815 → 747, induced 300 → 327). Checked by `holdStallSpeed` in `tests/ui.test.js`.
 
 Gust load factor (FAR 23 style):
 - μ = 2(W/S) ÷ (ρ·c·CLa·g)
